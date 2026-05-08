@@ -1,0 +1,17 @@
+# Models and checkpoints
+models/
+*.bin
+*.pt
+*.safetensors
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Data backups
+*.bak
+
+# OS
+.DS_Store
