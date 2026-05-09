@@ -22,7 +22,7 @@ LABEL2ID = {'literal': 0, 'idiomatic': 1}
 
 FIELDNAMES = [
     'run_id', 'model', 'langs', 'lr', 'epochs', 'batch_size',
-    'dev_f1', 'test_f1', 'en_f1', 'hi_f1', 'te_f1',
+    'dev_f1', 'test_f1', 'hi_te_avg', 'en_f1', 'hi_f1', 'te_f1',
     'train_size', 'test_size', 'notes'
 ]
 
@@ -87,6 +87,8 @@ def collect_run(run_dir):
         'en_f1':      lang_f1.get('English', ''),
         'hi_f1':      lang_f1.get('Hindi', ''),
         'te_f1':      lang_f1.get('Telugu', ''),
+        'hi_te_avg':  round((lang_f1.get('Hindi', 0) + lang_f1.get('Telugu', 0)) / 2, 4)
+                      if lang_f1.get('Hindi') and lang_f1.get('Telugu') else '',
         'train_size': m.get('train_size', ''),
         'test_size':  m.get('test_size', ''),
         'notes':      '',
@@ -133,7 +135,7 @@ def main():
         return
 
     # Sort by test_f1 descending
-    rows.sort(key=lambda r: float(r['test_f1']) if r['test_f1'] else 0, reverse=True)
+    rows.sort(key=lambda r: float(r['hi_te_avg']) if r['hi_te_avg'] else 0, reverse=True)
 
     # Write CSV
     with open(out_path, 'w', newline='', encoding='utf-8') as f:
@@ -144,15 +146,17 @@ def main():
     print(f"Wrote {len(rows)} runs → {out_path}\n")
 
     # Print summary table
-    print(f"{'Run':<35} {'Model':<20} {'Langs':<12} {'Dev F1':<9} {'Test F1':<9} {'EN':<8} {'HI':<8} {'TE':<8}")
-    print("─" * 109)
+    print(f"{'Run':<35} {'LR':<8} {'EP':<4} {'Dev F1':<9} {'Test F1':<9} {'HI+TE':<8} {'EN':<8} {'HI':<8} {'TE':<8}")
+    print("─" * 117)
     for r in rows:
-        print(f"{r['run_id']:<35} {r['model']:<20} {r['langs']:<12} "
+        print(f"{r['run_id']:<35} {str(r['lr']):<8} {str(r['epochs']):<4} "
               f"{str(r['dev_f1']):<9} {str(r['test_f1']):<9} "
-              f"{str(r['en_f1']):<8} {str(r['hi_f1']):<8} {str(r['te_f1']):<8}")
+              f"{str(r['hi_te_avg']):<8} {str(r['en_f1']):<8} "
+              f"{str(r['hi_f1']):<8} {str(r['te_f1']):<8}")
 
     best = rows[0]
-    print(f"\nBest so far: {best['run_id']} — test F1={best['test_f1']}  "
+    print(f"\nBest config (by HI+TE avg): {best['run_id']} — "
+          f"HI+TE={best['hi_te_avg']}  test_f1={best['test_f1']}  "
           f"EN={best['en_f1']}  HI={best['hi_f1']}  TE={best['te_f1']}")
 
 
