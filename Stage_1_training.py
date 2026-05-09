@@ -356,8 +356,8 @@ def train(args):
     scheduler    = get_linear_schedule_with_warmup(optimizer, warmup_steps, total_steps)
 
     if WANDB and args.use_wandb:
-        wandb.init(project='idiomator-app', config=config,
-           name=Path(args.output_dir).name)
+        wandb.init(project='idiom-classification', config=config,
+                   name=Path(args.output_dir).name)
 
     best_f1    = 0.0
     best_epoch = 0
