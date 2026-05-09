@@ -1,0 +1,603 @@
+"""
+train_stage2_span.py
+
+Stage 2: Fine-tune mBERT (or monolingual BERT) for MWE span extraction.
+Input  : raw sentence (no idiom hint)
+Output : start + end character offsets of the multi-word expression
+
+Task framing: QA-style (SQuAD), predicting start/end token indices.
+Trains on ALL examples (idiomatic + literal) since every example has a
+valid MWE span — the model just learns to find the expression regardless
+of whether it's used idiomatically or literally.
+
+Evaluation:
+  - Exact span match (predicted span == gold span exactly)
+  - Partial overlap F1 (token-level overlap between predicted and gold)
+
+Usage:
+    # mBERT multilingual
+    python train_stage2_span.py \
+        --output_dir models/stage2_mbert_en_hi_te \
+        --langs English Hindi Telugu
+
+    # Hindi + Telugu only
+    python train_stage2_span.py \
+        --output_dir models/stage2_mbert_hi_te \
+        --langs Hindi Telugu
+
+    # Monolingual BERT English
+    python train_stage2_span.py \
+        --model_name bert-base-uncased \
+        --output_dir models/stage2_bert_en \
+        --langs English
+"""
+
+import json
+import argparse
+import numpy as np
+from pathlib import Path
+from collections import defaultdict
+
+import torch
+from torch.utils.data import Dataset, DataLoader
+from transformers import (
+    AutoTokenizer,
+    AutoModel,
+    get_linear_schedule_with_warmup,
+)
+from torch.optim import AdamW
+from tqdm import tqdm
+
+try:
+    import wandb
+    WANDB = True
+except ImportError:
+    WANDB = False
+    print("wandb not installed — skipping. pip install wandb to enable.")
+
+
+# ── Config ────────────────────────────────────────────────────────────────────
+
+LOW_RESOURCE_LANGS = {'Hindi', 'Telugu'}
+
+RAW_FILES = {
+    'English': 'idioms_structured/Span_tagged_data/English/Final_English_MERGED_normalized.jsonl',
+    'Hindi':   'idioms_structured/Span_tagged_data/Hindi/Final_Hindi_MERGED.jsonl',
+    'Telugu':  'idioms_structured/Span_tagged_data/Telugu/Final_Telugu_MERGED.jsonl',
+}
+
+
+# ── Args ──────────────────────────────────────────────────────────────────────
+
+def parse_args():
+    p = argparse.ArgumentParser()
+    p.add_argument('--model_name',   default='bert-base-multilingual-cased')
+    p.add_argument('--data_dir',     default='idioms_structured/Splits')
+    p.add_argument('--output_dir',   default='models/stage2_mbert_en_hi_te')
+    p.add_argument('--langs',        nargs='+', default=['English', 'Hindi', 'Telugu'])
+    p.add_argument('--epochs',       type=int,   default=7)
+    p.add_argument('--batch_size',   type=int,   default=32)
+    p.add_argument('--lr',           type=float, default=1e-5)
+    p.add_argument('--max_len',      type=int,   default=128)
+    p.add_argument('--warmup_ratio', type=float, default=0.1)
+    p.add_argument('--seed',         type=int,   default=42)
+    p.add_argument('--use_wandb',    action='store_true')
+    p.add_argument('--device',       default=None)
+    return p.parse_args()
+
+
+# ── Device ────────────────────────────────────────────────────────────────────
+
+def get_device(forced=None):
+    if forced:
+        device = torch.device(forced)
+    elif torch.cuda.is_available():
+        device = torch.device('cuda')
+    elif torch.backends.mps.is_available():
+        print("MPS detected — precompiling shaders...")
+        device = torch.device('mps')
+        _x = torch.zeros(1, device=device) + 1
+        del _x
+        print("MPS shaders ready.")
+    else:
+        device = torch.device('cpu')
+    print(f"Device: {device}")
+    return device
+
+
+# ── Data loading ──────────────────────────────────────────────────────────────
+
+def load_raw_examples(lang):
+    """Load ALL examples from raw JSONL (used for Hi/Te)."""
+    examples = []
+    for line in open(RAW_FILES[lang], encoding='utf-8'):
+        r = json.loads(line)
+        for ex in r['examples']:
+            if ex.get('span_flagged'):
+                continue
+            examples.append({
+                'language':     lang,
+                'idiom_id':     r['idiom_id'],
+                'idiom':        r['idiom'],
+                'idiomaticity': r['Idiomaticity'],
+                'sentence':     ex['sentence'],
+                'span_start':   ex['span_start'],
+                'span_end':     ex['span_end'],
+                'matched_span': ex['matched_span'],
+            })
+    return examples
+
+
+def load_split_examples(split_path, langs):
+    langs_set = set(langs)
+    return [
+        json.loads(l) for l in open(split_path, encoding='utf-8')
+        if json.loads(l)['language'] in langs_set
+    ]
+
+
+def build_dataset_for_split(split_name, data_dir, langs, seed=42):
+    import random
+    random.seed(seed)
+
+    all_examples = []
+    en_langs = [l for l in langs if l not in LOW_RESOURCE_LANGS]
+    lr_langs  = [l for l in langs if l in LOW_RESOURCE_LANGS]
+
+    if en_langs:
+        split_path = Path(data_dir) / f'{split_name}.jsonl'
+        all_examples.extend(load_split_examples(split_path, en_langs))
+
+    split_idx  = {'train': 0, 'dev': 1, 'test': 2}[split_name]
+    ratios     = (0.80, 0.10, 0.10)
+
+    for lang in lr_langs:
+        raw = load_raw_examples(lang)
+        by_idiom = defaultdict(list)
+        for ex in raw:
+            by_idiom[ex['idiom_id']].append(ex)
+
+        idiom_ids = list(by_idiom.keys())
+        random.shuffle(idiom_ids)
+        n = len(idiom_ids)
+        boundaries = [0, int(n*ratios[0]), int(n*(ratios[0]+ratios[1])), n]
+        start, end = boundaries[split_idx], boundaries[split_idx + 1]
+        for iid in set(idiom_ids[start:end]):
+            all_examples.extend(by_idiom[iid])
+
+    return all_examples
+
+
+# ── Tokenization & span alignment ─────────────────────────────────────────────
+
+def char_to_token_span(encoding, char_start, char_end, sentence):
+    """
+    Convert character offsets to token indices using HuggingFace's
+    char_to_token() method. Returns (token_start, token_end) or None if
+    alignment fails.
+    """
+    # Find first token that starts at or after char_start
+    token_start = None
+    for i in range(len(sentence)):
+        t = encoding.char_to_token(i)
+        if t is not None and i >= char_start:
+            token_start = t
+            break
+
+    # Find last token that ends at or before char_end
+    token_end = None
+    for i in range(char_end - 1, -1, -1):
+        t = encoding.char_to_token(i)
+        if t is not None:
+            token_end = t
+            break
+
+    if token_start is None or token_end is None:
+        return None, None
+    if token_start > token_end:
+        token_end = token_start
+    return token_start, token_end
+
+
+# ── Dataset ───────────────────────────────────────────────────────────────────
+
+class SpanDataset(Dataset):
+    def __init__(self, examples, tokenizer, max_len):
+        self.valid_examples = []
+        self.input_ids      = []
+        self.attention_masks = []
+        self.token_type_ids  = []
+        self.start_positions = []
+        self.end_positions   = []
+
+        skipped = 0
+        for ex in examples:
+            sentence  = ex['sentence']
+            char_start = ex['span_start']
+            char_end   = ex['span_end']
+
+            encoding = tokenizer(
+                sentence,
+                max_length=max_len,
+                padding='max_length',
+                truncation=True,
+                return_offsets_mapping=False,
+                return_tensors='pt',
+            )
+
+            # Also encode without padding to get char_to_token mapping
+            enc_map = tokenizer(
+                sentence,
+                max_length=max_len,
+                truncation=True,
+                return_offsets_mapping=True,
+            )
+
+            token_start, token_end = char_to_token_span(
+                enc_map, char_start, char_end, sentence
+            )
+
+            if token_start is None or token_end is None:
+                skipped += 1
+                continue
+
+            # Clamp to max_len - 1
+            seq_len    = encoding['input_ids'].shape[1]
+            token_start = min(token_start, seq_len - 1)
+            token_end   = min(token_end,   seq_len - 1)
+
+            self.valid_examples.append(ex)
+            self.input_ids.append(encoding['input_ids'].squeeze(0))
+            self.attention_masks.append(encoding['attention_mask'].squeeze(0))
+            tid = encoding.get('token_type_ids')
+            self.token_type_ids.append(
+                tid.squeeze(0) if tid is not None
+                else torch.zeros(seq_len, dtype=torch.long)
+            )
+            self.start_positions.append(token_start)
+            self.end_positions.append(token_end)
+
+        if skipped:
+            print(f"  Skipped {skipped} examples with failed span alignment")
+
+    def __len__(self):
+        return len(self.valid_examples)
+
+    def __getitem__(self, idx):
+        return {
+            'input_ids':       self.input_ids[idx],
+            'attention_mask':  self.attention_masks[idx],
+            'token_type_ids':  self.token_type_ids[idx],
+            'start_positions': torch.tensor(self.start_positions[idx], dtype=torch.long),
+            'end_positions':   torch.tensor(self.end_positions[idx],   dtype=torch.long),
+        }
+
+
+# ── Model ─────────────────────────────────────────────────────────────────────
+
+class SpanExtractor(torch.nn.Module):
+    """mBERT + two linear heads for start/end token prediction (QA-style)."""
+
+    def __init__(self, model_name):
+        super().__init__()
+        self.bert       = AutoModel.from_pretrained(model_name)
+        hidden_size     = self.bert.config.hidden_size
+        self.start_head = torch.nn.Linear(hidden_size, 1)
+        self.end_head   = torch.nn.Linear(hidden_size, 1)
+
+    def forward(self, input_ids, attention_mask, token_type_ids):
+        outputs    = self.bert(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+        )
+        seq_output = outputs.last_hidden_state  # [batch, seq_len, hidden]
+
+        start_logits = self.start_head(seq_output).squeeze(-1)  # [batch, seq_len]
+        end_logits   = self.end_head(seq_output).squeeze(-1)    # [batch, seq_len]
+
+        # Mask padding tokens
+        mask = attention_mask.bool()
+        start_logits = start_logits.masked_fill(~mask, float('-inf'))
+        end_logits   = end_logits.masked_fill(~mask,   float('-inf'))
+
+        return start_logits, end_logits
+
+
+# ── Evaluation ────────────────────────────────────────────────────────────────
+
+def token_to_char_span(tokenizer, sentence, token_start, token_end, max_len):
+    """Convert predicted token indices back to character offsets."""
+    enc = tokenizer(sentence, max_length=max_len, truncation=True,
+                    return_offsets_mapping=True)
+    offsets = enc['offset_mapping']
+
+    if token_start >= len(offsets) or token_end >= len(offsets):
+        return None, None
+
+    char_start = offsets[token_start][0]
+    char_end   = offsets[token_end][1]
+    return char_start, char_end
+
+
+def compute_overlap_f1(pred_start, pred_end, gold_start, gold_end):
+    """Token-level overlap F1 between predicted and gold spans."""
+    pred_set = set(range(pred_start, pred_end + 1))
+    gold_set = set(range(gold_start, gold_end + 1))
+
+    if not pred_set or not gold_set:
+        return 0.0
+
+    overlap = len(pred_set & gold_set)
+    if overlap == 0:
+        return 0.0
+
+    precision = overlap / len(pred_set)
+    recall    = overlap / len(gold_set)
+    return 2 * precision * recall / (precision + recall)
+
+
+def evaluate(model, loader, tokenizer, examples, device, split_name, max_len):
+    model.eval()
+
+    exact_matches  = 0
+    overlap_f1s    = []
+    lang_exact     = defaultdict(list)
+    lang_f1        = defaultdict(list)
+    total          = 0
+
+    with torch.no_grad():
+        for batch_idx, batch in enumerate(tqdm(loader, desc=f'Eval {split_name}', leave=False)):
+            input_ids      = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            token_type_ids = batch['token_type_ids'].to(device)
+
+            start_logits, end_logits = model(input_ids, attention_mask, token_type_ids)
+
+            pred_starts = torch.argmax(start_logits, dim=-1).cpu().numpy()
+            pred_ends   = torch.argmax(end_logits,   dim=-1).cpu().numpy()
+            gold_starts = batch['start_positions'].numpy()
+            gold_ends   = batch['end_positions'].numpy()
+
+            batch_start = batch_idx * loader.batch_size
+            for i in range(len(pred_starts)):
+                ex_idx = batch_start + i
+                if ex_idx >= len(examples):
+                    break
+
+                ex         = examples[ex_idx]
+                sentence   = ex['sentence']
+                lang       = ex['language']
+
+                pred_s = int(pred_starts[i])
+                pred_e = int(pred_ends[i])
+                gold_s = int(gold_starts[i])
+                gold_e = int(gold_ends[i])
+
+                # Ensure pred_end >= pred_start
+                if pred_e < pred_s:
+                    pred_e = pred_s
+
+                # Exact match
+                exact = int(pred_s == gold_s and pred_e == gold_e)
+                exact_matches += exact
+                lang_exact[lang].append(exact)
+
+                # Overlap F1
+                f1 = compute_overlap_f1(pred_s, pred_e, gold_s, gold_e)
+                overlap_f1s.append(f1)
+                lang_f1[lang].append(f1)
+
+                total += 1
+
+    exact_match  = exact_matches / total if total > 0 else 0
+    avg_overlap  = np.mean(overlap_f1s) if overlap_f1s else 0
+
+    print(f"\n── {split_name} results ──")
+    print(f"  Exact match:    {exact_match:.4f}")
+    print(f"  Overlap F1:     {avg_overlap:.4f}")
+    print(f"  Total examples: {total}")
+
+    for lang in sorted(lang_exact.keys()):
+        le = np.mean(lang_exact[lang])
+        lf = np.mean(lang_f1[lang])
+        print(f"  {lang}: exact={le:.4f}  overlap_f1={lf:.4f}  ({len(lang_exact[lang])} examples)")
+
+    return exact_match, avg_overlap
+
+
+# ── Train ─────────────────────────────────────────────────────────────────────
+
+def train(args):
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+
+    device     = get_device(args.device)
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    config = vars(args)
+    json.dump(config, open(output_dir / 'config.json', 'w'), indent=2)
+    print(f"Languages: {args.langs}")
+
+    # Build datasets
+    train_examples = build_dataset_for_split('train', args.data_dir, args.langs, args.seed)
+    dev_examples   = build_dataset_for_split('dev',   args.data_dir, args.langs, args.seed)
+    test_examples  = build_dataset_for_split('test',  args.data_dir, args.langs, args.seed)
+
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+
+    print("Tokenizing train...")
+    train_ds = SpanDataset(train_examples, tokenizer, args.max_len)
+    print("Tokenizing dev...")
+    dev_ds   = SpanDataset(dev_examples,   tokenizer, args.max_len)
+    print("Tokenizing test...")
+    test_ds  = SpanDataset(test_examples,  tokenizer, args.max_len)
+
+    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True)
+    dev_loader   = DataLoader(dev_ds,   batch_size=args.batch_size)
+    test_loader  = DataLoader(test_ds,  batch_size=args.batch_size)
+
+    print(f"Train: {len(train_ds)} | Dev: {len(dev_ds)} | Test: {len(test_ds)}")
+
+    model     = SpanExtractor(args.model_name).to(device)
+    optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
+
+    total_steps  = len(train_loader) * args.epochs
+    warmup_steps = int(total_steps * args.warmup_ratio)
+    scheduler    = get_linear_schedule_with_warmup(optimizer, warmup_steps, total_steps)
+
+    criterion = torch.nn.CrossEntropyLoss()
+
+    if WANDB and args.use_wandb:
+        wandb.init(project='idiomator-app', config=config,
+                   name=f"stage2_{Path(args.output_dir).name}")
+
+    best_overlap = 0.0
+    best_epoch   = 0
+
+    for epoch in range(1, args.epochs + 1):
+        model.train()
+        total_loss = 0.0
+
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch}/{args.epochs}", unit='batch')
+        for batch in pbar:
+            input_ids       = batch['input_ids'].to(device)
+            attention_mask  = batch['attention_mask'].to(device)
+            token_type_ids  = batch['token_type_ids'].to(device)
+            start_positions = batch['start_positions'].to(device)
+            end_positions   = batch['end_positions'].to(device)
+
+            start_logits, end_logits = model(input_ids, attention_mask, token_type_ids)
+
+            start_loss = criterion(start_logits, start_positions)
+            end_loss   = criterion(end_logits,   end_positions)
+            loss       = (start_loss + end_loss) / 2
+
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
+            scheduler.step()
+            optimizer.zero_grad()
+
+            total_loss += loss.item()
+            pbar.set_postfix({'loss': f'{loss.item():.4f}'})
+
+        avg_loss = total_loss / len(train_loader)
+        print(f"\nEpoch {epoch} avg loss: {avg_loss:.4f}")
+
+        exact, overlap = evaluate(
+            model, dev_loader, tokenizer, dev_ds.valid_examples,
+            device, f'Dev (epoch {epoch})', args.max_len
+        )
+
+        if WANDB and args.use_wandb:
+            wandb.log({'epoch': epoch, 'train_loss': avg_loss,
+                       'dev_exact': exact, 'dev_overlap_f1': overlap})
+
+        # Optimise for overlap F1 (more lenient, better for low-resource)
+        if overlap > best_overlap:
+            best_overlap = overlap
+            best_epoch   = epoch
+            model.bert.save_pretrained(output_dir / 'best_model')
+            tokenizer.save_pretrained(output_dir / 'best_model')
+            # Save span heads separately
+            torch.save({
+                'start_head': model.start_head.state_dict(),
+                'end_head':   model.end_head.state_dict(),
+            }, output_dir / 'best_model' / 'span_heads.pt')
+            print(f"  ✓ New best model saved (dev overlap F1: {best_overlap:.4f})")
+
+    print(f"\nBest dev overlap F1: {best_overlap:.4f} at epoch {best_epoch}")
+
+    # Final test eval
+    print("\nLoading best model for test evaluation...")
+    best_model = SpanExtractor(args.model_name)
+    best_model.bert = AutoModel.from_pretrained(output_dir / 'best_model')
+    heads = torch.load(output_dir / 'best_model' / 'span_heads.pt',
+                       map_location='cpu')
+    best_model.start_head.load_state_dict(heads['start_head'])
+    best_model.end_head.load_state_dict(heads['end_head'])
+    best_model = best_model.to(device)
+
+    test_exact, test_overlap = evaluate(
+        best_model, test_loader, tokenizer, test_ds.valid_examples,
+        device, 'Test (final)', args.max_len
+    )
+
+    # Save predictions
+    best_model.eval()
+    preds_out = []
+    with torch.no_grad():
+        for batch_idx, batch in enumerate(test_loader):
+            input_ids      = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            token_type_ids = batch['token_type_ids'].to(device)
+
+            start_logits, end_logits = best_model(input_ids, attention_mask, token_type_ids)
+            pred_starts = torch.argmax(start_logits, dim=-1).cpu().numpy()
+            pred_ends   = torch.argmax(end_logits,   dim=-1).cpu().numpy()
+            gold_starts = batch['start_positions'].numpy()
+            gold_ends   = batch['end_positions'].numpy()
+
+            batch_start = batch_idx * test_loader.batch_size
+            for i in range(len(pred_starts)):
+                ex_idx = batch_start + i
+                if ex_idx >= len(test_ds.valid_examples):
+                    break
+                ex = test_ds.valid_examples[ex_idx]
+
+                pred_s = int(pred_starts[i])
+                pred_e = int(pred_ends[i])
+                if pred_e < pred_s:
+                    pred_e = pred_s
+
+                gold_s = int(gold_starts[i])
+                gold_e = int(gold_ends[i])
+
+                # Convert token indices back to char offsets
+                pred_char_s, pred_char_e = token_to_char_span(
+                    tokenizer, ex['sentence'], pred_s, pred_e, args.max_len
+                )
+
+                pred_span = ex['sentence'][pred_char_s:pred_char_e] \
+                    if pred_char_s is not None else ''
+
+                preds_out.append({
+                    **ex,
+                    'pred_span_start':  pred_char_s,
+                    'pred_span_end':    pred_char_e,
+                    'pred_matched_span': pred_span,
+                    'exact_match':      bool(pred_s == gold_s and pred_e == gold_e),
+                    'overlap_f1':       round(compute_overlap_f1(pred_s, pred_e, gold_s, gold_e), 4),
+                })
+
+    preds_path = output_dir / 'test_predictions.jsonl'
+    with open(preds_path, 'w', encoding='utf-8') as f:
+        for p in preds_out:
+            f.write(json.dumps(p, ensure_ascii=False) + '\n')
+    print(f"Predictions saved → {preds_path}")
+
+    metrics = {
+        'best_dev_overlap_f1': best_overlap,
+        'best_epoch':          best_epoch,
+        'test_exact_match':    test_exact,
+        'test_overlap_f1':     test_overlap,
+        'model':               args.model_name,
+        'langs':               args.langs,
+        'train_size':          len(train_ds),
+        'test_size':           len(test_ds),
+    }
+    json.dump(metrics, open(output_dir / 'metrics.json', 'w'), indent=2)
+    print(f"Metrics saved → {output_dir / 'metrics.json'}")
+
+    if WANDB and args.use_wandb:
+        wandb.log({'test_exact_match': test_exact, 'test_overlap_f1': test_overlap})
+        wandb.finish()
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+
+if __name__ == '__main__':
+    args = parse_args()
+    train(args)
