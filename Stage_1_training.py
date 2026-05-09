@@ -250,10 +250,10 @@ class IdiomDataset(Dataset):
 
         self.encodings = tokenizer(
             [ex['sentence'] for ex in examples],
-            max_length=max_len,
-            padding='max_length',
-            truncation=True,
-            return_tensors='pt',
+            max_length = max_len,
+            padding ='max_length',
+            truncation = True,
+            return_tensors ='pt',
         )
 
     def __len__(self):

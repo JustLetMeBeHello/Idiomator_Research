@@ -10,6 +10,8 @@ __pycache__/
 .venv/
 *.egg-info/
 
+*.env
+
 # Data backups
 *.bak
 
