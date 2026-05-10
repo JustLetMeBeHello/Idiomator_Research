@@ -194,6 +194,8 @@ def run_trial(trial, args, train_ds, dev_ds, tokenizer, device, output_dir):
     criterion    = torch.nn.CrossEntropyLoss()
 
     best_epoch_score = 0.0
+    best_lang_scores = {}
+    best_epoch       = 1
 
     for epoch in range(1, epochs + 1):
         model.train()
@@ -250,23 +252,21 @@ def run_trial(trial, args, train_ds, dev_ds, tokenizer, device, output_dir):
                 wandb.finish()
             raise optuna.exceptions.TrialPruned()
 
-        # Save best model for this trial
+        # Track best epoch score — no model weights saved during search
         if score > best_epoch_score:
             best_epoch_score = score
-            trial_dir = output_dir / f'trial_{trial.number}'
-            trial_dir.mkdir(parents=True, exist_ok=True)
-            model.bert.save_pretrained(trial_dir / 'best_model')
-            tokenizer.save_pretrained(trial_dir / 'best_model')
-            torch.save({
-                'start_head': model.start_head.state_dict(),
-                'end_head':   model.end_head.state_dict(),
-            }, trial_dir / 'best_model' / 'span_heads.pt')
-            json.dump({
-                'lr': lr, 'epochs': epochs, 'batch_size': batch_size,
-                'warmup_ratio': warmup_ratio, 'best_epoch': epoch,
-                'dev_hi_te_overlap_f1': best_epoch_score,
-                'lang_scores': lang_scores,
-            }, open(trial_dir / 'config.json', 'w'), indent=2)
+            best_lang_scores = lang_scores
+            best_epoch       = epoch
+
+    # Save config only — no weights, keeps Drive usage minimal
+    trial_dir = output_dir / f'trial_{trial.number}'
+    trial_dir.mkdir(parents=True, exist_ok=True)
+    json.dump({
+        'lr': lr, 'epochs': epochs, 'batch_size': batch_size,
+        'warmup_ratio': warmup_ratio, 'best_epoch': best_epoch,
+        'dev_hi_te_overlap_f1': best_epoch_score,
+        'lang_scores': best_lang_scores,
+    }, open(trial_dir / 'config.json', 'w'), indent=2)
 
     if WANDB and args.use_wandb:
         wandb.log({'best_hi_te_overlap_f1': best_epoch_score})
@@ -333,6 +333,13 @@ def main():
         pruner=pruner,
         study_name='stage2_span_extraction',
     )
+
+    # Clean up any trials stuck in RUNNING state from a crashed session
+    from optuna.trial import TrialState
+    for t in study.trials:
+        if t.state == TrialState.RUNNING:
+            study.tell(t.number, state=TrialState.FAIL)
+            print(f"  ↳ Marked stuck trial {t.number} as FAILED")
 
     # How many trials are left to run
     completed = len([t for t in study.trials if t.value is not None])
