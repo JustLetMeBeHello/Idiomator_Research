@@ -1,5 +1,5 @@
 """
-optuna_stage2.py
+Optuna_Stage_2.py
 
 Optuna hyperparameter search for Stage 2 MWE span extraction.
 Runs 30 trials, optimizing dev overlap F1 on Hindi+Telugu average.
@@ -10,20 +10,18 @@ Tunes:
   - batch_size   : 16, 32
   - warmup_ratio : 0.06, 0.1, 0.2
 
-Usage in Colab:
+Usage:
     %%bash
-    cd /content/drive/MyDrive/Idiomator_Research
-    python optuna_stage2.py \
-        --output_dir models/stage2_optuna \
+    cd /content/drive/MyDrive/Idiomator_Research/Research_And_Training
+    python Google_Colab/Optuna_Stage_2.py \
         --langs English Hindi Telugu \
-        --n_trials 30
-
-    # Hindi + Telugu only
-    python optuna_stage2.py \
-        --output_dir models/stage2_optuna_hi_te \
-        --langs Hindi Telugu \
-        --n_trials 30
+        --output_dir models/stage2_optuna \
+        --n_trials 30 \
+        --use_wandb
 """
+
+import sys
+sys.path.append('/content/drive/MyDrive/Idiomator_Research/Research_And_Training')
 
 import json
 import argparse
@@ -53,6 +51,7 @@ try:
     WANDB = True
 except ImportError:
     WANDB = False
+    print("wandb not installed — skipping tracking.")
 
 
 # ── Args ──────────────────────────────────────────────────────────────────────
@@ -71,12 +70,16 @@ def parse_args():
     return p.parse_args()
 
 
-# ── Eval ──────────────────────────────────────────────────────────────────────
+# ── Constants ─────────────────────────────────────────────────────────────────
 
 LOW_RESOURCE = {'Hindi', 'Telugu'}
 
+
+# ── Eval ──────────────────────────────────────────────────────────────────────
+
 def evaluate_overlap(model, loader, examples, device):
-    """Returns HI+TE average overlap F1 — our optimization target."""
+    """Returns HI+TE average overlap F1 — our optimization target.
+    Also returns per-language breakdown dict for wandb logging."""
     model.eval()
     lang_f1 = defaultdict(list)
 
@@ -109,19 +112,43 @@ def evaluate_overlap(model, loader, examples, device):
                 f1 = compute_overlap_f1(pred_s, pred_e, gold_s, gold_e)
                 lang_f1[lang].append(f1)
 
-    # Print per-language breakdown
-    lr_scores = []
+    # Per-language scores
+    lang_scores = {}
+    lr_scores   = []
     for lang in sorted(lang_f1.keys()):
         score = np.mean(lang_f1[lang])
+        lang_scores[lang] = round(float(score), 4)
         print(f"    {lang}: overlap F1 = {score:.4f} ({len(lang_f1[lang])} examples)")
         if lang in LOW_RESOURCE:
             lr_scores.append(score)
 
-    # Optimization target: HI+TE average (or overall if no LR langs)
+    # Optimization target
     target = np.mean(lr_scores) if lr_scores else np.mean([
         s for scores in lang_f1.values() for s in scores
     ])
-    return target
+    return float(target), lang_scores
+
+
+# ── Incremental save callback ─────────────────────────────────────────────────
+
+def make_save_callback(output_dir):
+    """Returns an Optuna callback that flushes results to JSON after every trial.
+    Safe to call on resume — rewrites the full sorted list each time."""
+    def save_callback(study, trial):
+        results = []
+        for t in study.trials:
+            if t.value is not None:
+                results.append({
+                    'trial': t.number,
+                    'value': t.value,
+                    **t.params,
+                    'state': str(t.state),
+                })
+        results.sort(key=lambda r: r['value'], reverse=True)
+        json.dump(results, open(output_dir / 'optuna_results.json', 'w'), indent=2)
+        print(f"  [callback] Results flushed → optuna_results.json "
+              f"({len(results)} completed trials)")
+    return save_callback
 
 
 # ── Single trial ──────────────────────────────────────────────────────────────
@@ -137,6 +164,23 @@ def run_trial(trial, args, train_ds, dev_ds, tokenizer, device, output_dir):
 
     print(f"\n── Trial {trial.number} ──")
     print(f"  lr={lr}  epochs={epochs}  bs={batch_size}  warmup={warmup_ratio}")
+
+    # Start a fresh wandb run for this trial
+    if WANDB and args.use_wandb:
+        wandb.init(
+            project='idiomator-app',
+            name=f"stage2_trial_{trial.number}",
+            config={
+                'trial':         trial.number,
+                'lr':            lr,
+                'epochs':        epochs,
+                'batch_size':    batch_size,
+                'warmup_ratio':  warmup_ratio,
+                'langs':         args.langs,
+                'stage':         2,
+            },
+            reinit=True,
+        )
 
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
     dev_loader   = DataLoader(dev_ds,   batch_size=batch_size)
@@ -181,19 +225,34 @@ def run_trial(trial, args, train_ds, dev_ds, tokenizer, device, output_dir):
         avg_loss = total_loss / len(train_loader)
         print(f"  Epoch {epoch} avg loss: {avg_loss:.4f}")
 
-        # Eval on dev
-        score = evaluate_overlap(model, dev_loader, dev_ds.valid_examples, device)
+        # Eval on dev — get target score + per-language breakdown
+        score, lang_scores = evaluate_overlap(
+            model, dev_loader, dev_ds.valid_examples, device
+        )
         print(f"  → HI+TE overlap F1: {score:.4f}")
 
-        # Optuna pruning — stop unpromising trials early
+        # Log per-epoch metrics to wandb
+        if WANDB and args.use_wandb:
+            log_dict = {
+                'epoch':          epoch,
+                'train_loss':     avg_loss,
+                'dev_hi_te_f1':   score,
+            }
+            for lang, lang_score in lang_scores.items():
+                log_dict[f'dev_{lang.lower()}_overlap_f1'] = lang_score
+            wandb.log(log_dict)
+
+        # Optuna pruning
         trial.report(score, epoch)
         if trial.should_prune():
             print(f"  ✗ Trial pruned at epoch {epoch}")
+            if WANDB and args.use_wandb:
+                wandb.finish()
             raise optuna.exceptions.TrialPruned()
 
+        # Save best model for this trial
         if score > best_epoch_score:
             best_epoch_score = score
-            # Save best model for this trial
             trial_dir = output_dir / f'trial_{trial.number}'
             trial_dir.mkdir(parents=True, exist_ok=True)
             model.bert.save_pretrained(trial_dir / 'best_model')
@@ -206,7 +265,12 @@ def run_trial(trial, args, train_ds, dev_ds, tokenizer, device, output_dir):
                 'lr': lr, 'epochs': epochs, 'batch_size': batch_size,
                 'warmup_ratio': warmup_ratio, 'best_epoch': epoch,
                 'dev_hi_te_overlap_f1': best_epoch_score,
+                'lang_scores': lang_scores,
             }, open(trial_dir / 'config.json', 'w'), indent=2)
+
+    if WANDB and args.use_wandb:
+        wandb.log({'best_hi_te_overlap_f1': best_epoch_score})
+        wandb.finish()
 
     return best_epoch_score
 
@@ -240,32 +304,49 @@ def main():
 
     print(f"Train: {len(train_ds)} | Dev: {len(dev_ds)}")
 
-    if WANDB and args.use_wandb:
-        wandb.init(project='idiomator-app',
-                   name=f"stage2_optuna_{'_'.join(l[:2].lower() for l in args.langs)}")
-
     # ── Optuna study ──────────────────────────────────────────────────────────
+    # SQLite storage on Drive — survives Colab timeouts and resumes automatically
+    db_path = output_dir / 'optuna_study.db'
+    storage = f"sqlite:///{db_path}"
+    print(f"\nOptuna storage : {db_path}")
+    if db_path.exists():
+        print("  ↳ Existing study found — resuming from checkpoint")
+    else:
+        print("  ↳ No existing study — starting fresh")
+
     def objective(trial):
         return run_trial(
             trial, args, train_ds, dev_ds, tokenizer, device, output_dir
         )
 
-    # TPE sampler — learns from previous trials to focus on promising regions
-    # MedianPruner — stops trials that are below median at each epoch
     sampler = TPESampler(seed=args.seed)
     pruner  = optuna.pruners.MedianPruner(
-        n_startup_trials=5,   # don't prune first 5 trials
-        n_warmup_steps=2,     # don't prune before epoch 2
+        n_startup_trials=5,
+        n_warmup_steps=2,
     )
 
     study = optuna.create_study(
+        storage=storage,
+        load_if_exists=True,      # ← resumes if session died mid-run
         direction='maximize',
         sampler=sampler,
         pruner=pruner,
         study_name='stage2_span_extraction',
     )
 
-    study.optimize(objective, n_trials=args.n_trials)
+    # How many trials are left to run
+    completed = len([t for t in study.trials if t.value is not None])
+    remaining = args.n_trials - completed
+    print(f"Trials complete: {completed} / {args.n_trials}  →  running {remaining} more")
+
+    if remaining <= 0:
+        print("All trials already complete — nothing to run.")
+    else:
+        study.optimize(
+            objective,
+            n_trials=remaining,                    # only run what's left
+            callbacks=[make_save_callback(output_dir)],  # flush JSON after each trial
+        )
 
     # ── Results ───────────────────────────────────────────────────────────────
     print(f"\n{'='*60}")
@@ -279,17 +360,16 @@ def main():
     for k, v in best.params.items():
         print(f"  {k}: {v}")
 
-    # Save full results
+    # Final save (also written incrementally by callback, this is the canonical copy)
     results = []
     for t in study.trials:
         if t.value is not None:
             results.append({
-                'trial':         t.number,
-                'value':         t.value,
+                'trial': t.number,
+                'value': t.value,
                 **t.params,
-                'state':         str(t.state),
+                'state': str(t.state),
             })
-
     results.sort(key=lambda r: r['value'], reverse=True)
 
     results_path = output_dir / 'optuna_results.json'
@@ -303,15 +383,10 @@ def main():
         print(f"{r['trial']:<8} {r['value']:<10.4f} {str(r['lr']):<8} "
               f"{r['epochs']:<4} {r['batch_size']:<4} {r['warmup_ratio']:<6}")
 
-    # Save best config to a clean JSON for use in training
+    # Save best config
     best_config = {**best.params, 'model_name': args.model_name, 'langs': args.langs}
-    best_config_path = output_dir / 'best_config.json'
-    json.dump(best_config, open(best_config_path, 'w'), indent=2)
-    print(f"Best config saved → {best_config_path}")
-
-    if WANDB and args.use_wandb:
-        wandb.log({'best_hi_te_overlap_f1': best.value, **best.params})
-        wandb.finish()
+    json.dump(best_config, open(output_dir / 'best_config.json', 'w'), indent=2)
+    print(f"Best config saved → {output_dir / 'best_config.json'}")
 
     print(f"\nTo train final model with best config:")
     print(f"  python Stage_2_training.py \\")
