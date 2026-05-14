@@ -38,7 +38,7 @@ from tqdm import tqdm
 import optuna
 from optuna.samplers import TPESampler
 
-from Stage_2_training import (
+from Base_Pipeline.Stage_2_training import (
     SpanExtractor,
     SpanDataset,
     build_dataset_for_split,

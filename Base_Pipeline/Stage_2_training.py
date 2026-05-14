@@ -60,12 +60,6 @@ except ImportError:
 
 LOW_RESOURCE_LANGS = {'Hindi', 'Telugu'}
 
-RAW_FILES = {
-    'English': 'idioms_structured/Span_tagged_data/English/Final_English_MERGED_normalized.jsonl',
-    'Hindi':   'idioms_structured/Span_tagged_data/Hindi/Final_Hindi_MERGED.jsonl',
-    'Telugu':  'idioms_structured/Span_tagged_data/Telugu/Final_Telugu_MERGED.jsonl',
-}
-
 
 # ── Args ──────────────────────────────────────────────────────────────────────
 
@@ -107,64 +101,28 @@ def get_device(forced=None):
 
 # ── Data loading ──────────────────────────────────────────────────────────────
 
-def load_raw_examples(lang):
-    """Load ALL examples from raw JSONL (used for Hi/Te)."""
-    examples = []
-    for line in open(RAW_FILES[lang], encoding='utf-8'):
-        r = json.loads(line)
-        for ex in r['examples']:
-            if ex.get('span_flagged'):
-                continue
-            examples.append({
-                'language':     lang,
-                'idiom_id':     r['idiom_id'],
-                'idiom':        r['idiom'],
-                'idiomaticity': r['Idiomaticity'],
-                'sentence':     ex['sentence'],
-                'span_start':   ex['span_start'],
-                'span_end':     ex['span_end'],
-                'matched_span': ex['matched_span'],
-            })
-    return examples
-
-
 def load_split_examples(split_path, langs):
+    """Load examples for specific languages from a split file."""
+    if not split_path.exists():
+        print(f"  ⚠ Split file not found: {split_path}")
+        return []
+    
     langs_set = set(langs)
     return [
         json.loads(l) for l in open(split_path, encoding='utf-8')
         if json.loads(l)['language'] in langs_set
     ]
 
-
 def build_dataset_for_split(split_name, data_dir, langs, seed=42):
-    import random
-    random.seed(seed)
-
-    all_examples = []
-    en_langs = [l for l in langs if l not in LOW_RESOURCE_LANGS]
-    lr_langs  = [l for l in langs if l in LOW_RESOURCE_LANGS]
-
-    if en_langs:
-        split_path = Path(data_dir) / f'{split_name}.jsonl'
-        all_examples.extend(load_split_examples(split_path, en_langs))
-
-    split_idx  = {'train': 0, 'dev': 1, 'test': 2}[split_name]
-    ratios     = (0.80, 0.10, 0.10)
-
-    for lang in lr_langs:
-        raw = load_raw_examples(lang)
-        by_idiom = defaultdict(list)
-        for ex in raw:
-            by_idiom[ex['idiom_id']].append(ex)
-
-        idiom_ids = list(by_idiom.keys())
-        random.shuffle(idiom_ids)
-        n = len(idiom_ids)
-        boundaries = [0, int(n*ratios[0]), int(n*(ratios[0]+ratios[1])), n]
-        start, end = boundaries[split_idx], boundaries[split_idx + 1]
-        for iid in set(idiom_ids[start:end]):
-            all_examples.extend(by_idiom[iid])
-
+    """
+    Load the dataset using only the JSONL splits in the directory.
+    """
+    split_path = Path(data_dir) / f'{split_name}.jsonl'
+    print(f"Loading {split_name} from {split_path}...")
+    
+    # Load all requested languages directly from the split file
+    all_examples = load_split_examples(split_path, langs)
+    
     return all_examples
 
 

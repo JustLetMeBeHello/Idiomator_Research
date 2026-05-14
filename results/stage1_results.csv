@@ -1,0 +1,6 @@
+run_id,model,langs,lr,epochs,batch_size,dev_f1,test_f1,hi_te_avg,en_f1,hi_f1,te_f1,train_size,test_size,notes
+joint_mbert_en_hi_te,multilingual-cased,EN+HI+TE,1e-05,6,32,0,0,0.7564,0.8149,0.7103,0.8024,3733,482,
+stage1_mbert_en_hi_te,multilingual-cased,EN+HI+TE,3e-05,3,32,0.8162,0.7693,0.7332,0.8125,0.6887,0.7777,3733,482,
+gpt_baseline_stage1,gpt-4o,,,,,0,0.7625,0.647,0.8132,0.6471,0.6468,,379,
+gpt_baseline_stage2,gpt-4o,,,,,0,0,0.3121,0.3227,0.3038,0.3204,,379,
+gpt_single_stage,gpt-4o,,,,,0,0,0.3121,0.3227,0.3038,0.3204,,379,

@@ -27,7 +27,7 @@ from transformers import AutoTokenizer, AutoModel
 # Import from Stage 2 training script
 import sys
 sys.path.append('.')
-from Stage_2_training import (
+from Base_Pipeline.Stage_2_training import (
     SpanExtractor,
     SpanDataset,
     build_dataset_for_split,

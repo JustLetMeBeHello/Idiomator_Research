@@ -66,13 +66,9 @@ ID2LABEL  = {0: 'literal', 1: 'idiomatic'}
 
 # Languages that use ALL examples (no sampling cap)
 LOW_RESOURCE_LANGS = {'Hindi', 'Telugu'}
-
+#Research_And_Training/
 # Raw data paths (used to load full Hi/Te data bypassing sampled splits)
-RAW_FILES = {
-    'English': 'Research_And_Training/idioms_structured/Span_tagged_data/English/Final_English_MERGED_normalized.jsonl',
-    'Hindi':   'Research_And_Training/idioms_structured/Span_tagged_data/Hindi/Final_Hindi_MERGED.jsonl',
-    'Telugu':  'Research_And_Training/idioms_structured/Span_tagged_data/Telugu/Final_Telugu_MERGED.jsonl',
-}
+
 
 
 # ── Args ──────────────────────────────────────────────────────────────────────
@@ -80,7 +76,7 @@ RAW_FILES = {
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument('--model_name',   default='bert-base-multilingual-cased')
-    p.add_argument('--data_dir',     default='Research_And_Training/idioms_structured/Splits')
+    p.add_argument('--data_dir',     default='idioms_structured/Splits')
     p.add_argument('--output_dir',   default='models/stage1_mbert_en_hi_te')
     p.add_argument('--langs',        nargs='+', default=['English', 'Hindi', 'Telugu'],
                    help='Languages to include e.g. --langs English Hindi Telugu')
@@ -121,83 +117,31 @@ def get_device(forced=None):
 
 # ── Data loading ──────────────────────────────────────────────────────────────
 
-def load_raw_examples(lang):
-    """Load ALL examples from raw JSONL for a language (used for Hi/Te)."""
-    path = RAW_FILES[lang]
-    examples = []
-    for line in open(path, encoding='utf-8'):
-        r = json.loads(line)
-        for ex in r['examples']:
-            if ex.get('span_flagged'):
-                continue
-            examples.append({
-                'language':     lang,
-                'idiom_id':     r['idiom_id'],
-                'idiom':        r['idiom'],
-                'meaning_id':   r['meaning_id'],
-                'sense_number': r['sense_number'],
-                'idiomaticity': r['Idiomaticity'],
-                'register':     r['Register'],
-                'region':       r['Region'],
-                'sentence':     ex['sentence'],
-                'span_start':   ex['span_start'],
-                'span_end':     ex['span_end'],
-                'matched_span': ex['matched_span'],
-            })
-    return examples
-
+# ── Data loading ──────────────────────────────────────────────────────────────
 
 def load_split_examples(split_path, langs):
-    """Load examples from a pre-built split JSONL, filtered to langs."""
+    """
+    Load examples directly from precomputed split JSONL files.
+    """
     langs_set = set(langs)
     examples = []
-    for line in open(split_path, encoding='utf-8'):
-        r = json.loads(line)
-        if r['language'] in langs_set:
-            examples.append(r)
+
+    with open(split_path, encoding='utf-8') as f:
+        for line in f:
+            r = json.loads(line)
+            if r['language'] in langs_set:
+                examples.append(r)
+
     return examples
 
 
-def build_dataset_for_split(split_name, data_dir, langs, seed=42):
+def build_dataset_for_split(split_name, data_dir, langs):
     """
-    Build the final example list for a split:
-      - Low-resource langs (Hi/Te): load ALL raw examples, apply unseen 80/10/10 split
-      - English: use pre-built sampled split
+    Load train/dev/test directly from:
+      idioms_structured/Splits/{split_name}.jsonl
     """
-    import random
-    random.seed(seed)
-
-    all_examples = []
-    en_langs = [l for l in langs if l not in LOW_RESOURCE_LANGS]
-    lr_langs  = [l for l in langs if l in LOW_RESOURCE_LANGS]
-
-    # High-resource langs: use pre-built splits
-    if en_langs:
-        split_path = Path(data_dir) / f'{split_name}.jsonl'
-        all_examples.extend(load_split_examples(split_path, en_langs))
-
-    # Low-resource langs: load all raw, apply unseen idiom split
-    split_idx = {'train': 0, 'dev': 1, 'test': 2}[split_name]
-    ratios = (0.80, 0.10, 0.10)
-
-    for lang in lr_langs:
-        raw = load_raw_examples(lang)
-
-        by_idiom = defaultdict(list)
-        for ex in raw:
-            by_idiom[ex['idiom_id']].append(ex)
-
-        idiom_ids = list(by_idiom.keys())
-        random.shuffle(idiom_ids)
-        n = len(idiom_ids)
-        boundaries = [0, int(n * ratios[0]), int(n * (ratios[0] + ratios[1])), n]
-        start, end = boundaries[split_idx], boundaries[split_idx + 1]
-        split_ids  = set(idiom_ids[start:end])
-
-        for iid in split_ids:
-            all_examples.extend(by_idiom[iid])
-
-    return all_examples
+    split_path = Path(data_dir) / f'{split_name}.jsonl'
+    return load_split_examples(split_path, langs)
 
 
 # ── Loss weights ──────────────────────────────────────────────────────────────
@@ -325,9 +269,9 @@ def train(args):
     print(f"Languages: {args.langs}")
 
     # Build datasets
-    train_examples = build_dataset_for_split('train', args.data_dir, args.langs, args.seed)
-    dev_examples   = build_dataset_for_split('dev',   args.data_dir, args.langs, args.seed)
-    test_examples  = build_dataset_for_split('test',  args.data_dir, args.langs, args.seed)
+    train_examples = build_dataset_for_split('train', args.data_dir, args.langs)
+    dev_examples   = build_dataset_for_split('dev',   args.data_dir, args.langs)
+    test_examples  = build_dataset_for_split('test',  args.data_dir, args.langs)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     train_ds  = IdiomDataset(train_examples, tokenizer, args.max_len)
