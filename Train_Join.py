@@ -530,8 +530,8 @@ def train(args):
         wandb.init(project='idiom-joint', config=config,
                    name=Path(args.output_dir).name)
 
-    best_dev_f1  = 0.0   # optimise for cls macro F1 (consistent with Stage 1 saving criterion)
-    best_epoch   = 0
+    best_dev_joint_f1 = 0.0   # optimise for joint F1 = geomean(cls_macro_f1, span_overlap_f1)
+    best_epoch        = 0
 
     for epoch in range(1, args.epochs + 1):
         model.train()
@@ -579,22 +579,29 @@ def train(args):
             device, f'Dev (epoch {epoch})', args.max_len
         )
 
+        # Joint F1 = geometric mean of cls macro F1 and span overlap F1
+        # Geometric mean penalises models that sacrifice one task for the other
+        import math
+        dev_joint_f1 = math.sqrt(dev_cls_f1 * dev_overlap) if (dev_cls_f1 > 0 and dev_overlap > 0) else 0.0
+        print(f"  Dev joint F1 (geomean): {dev_joint_f1:.4f}  (cls={dev_cls_f1:.4f}, span_overlap={dev_overlap:.4f})")
+
         if WANDB and args.use_wandb:
             wandb.log({
-                'epoch':          epoch,
-                'train_loss':     avg_loss,
-                'dev_cls_f1':     dev_cls_f1,
-                'dev_span_exact': dev_exact,
-                'dev_span_f1':    dev_overlap,
+                'epoch':           epoch,
+                'train_loss':      avg_loss,
+                'dev_cls_f1':      dev_cls_f1,
+                'dev_span_exact':  dev_exact,
+                'dev_span_f1':     dev_overlap,
+                'dev_joint_f1':    dev_joint_f1,
             })
 
-        if dev_cls_f1 > best_dev_f1:
-            best_dev_f1 = dev_cls_f1
-            best_epoch  = epoch
+        if dev_joint_f1 > best_dev_joint_f1:
+            best_dev_joint_f1 = dev_joint_f1
+            best_epoch        = epoch
             save_model(model, tokenizer, output_dir)
-            print(f"  ✓ New best model saved (dev cls macro F1: {best_dev_f1:.4f})")
+            print(f"  ✓ New best model saved (dev joint F1: {best_dev_joint_f1:.4f})")
 
-    print(f"\nBest dev cls F1: {best_dev_f1:.4f} at epoch {best_epoch}")
+    print(f"\nBest dev joint F1: {best_dev_joint_f1:.4f} at epoch {best_epoch}")
 
     # Final test eval
     print("\nLoading best model for test evaluation...")
@@ -664,7 +671,8 @@ def train(args):
     print(f"Predictions saved → {preds_path}")
 
     metrics = {
-        'best_dev_cls_f1':   best_dev_f1,
+        'best_dev_cls_f1':   dev_cls_f1,
+        'best_dev_joint_f1': best_dev_joint_f1,
         'best_epoch':        best_epoch,
         'test_cls_macro_f1': test_cls_f1,
         'test_span_exact':   test_exact,
