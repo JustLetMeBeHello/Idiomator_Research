@@ -32,7 +32,8 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer, AutoModel, get_linear_schedule_with_warmup
 from torch.optim import AdamW
-from tqdm import tqdm
+# Change this import at the top of your script:
+from tqdm.notebook import tqdm
 
 import optuna
 from optuna.samplers import TPESampler
@@ -431,8 +432,32 @@ def make_objective(args, train_ds, dev_ds, tokenizer, device):
         for lang, val in best_per_lang.items():
             row[f'{lang.lower()}_f1'] = round(val, 4)
 
+# ... (keep the existing dictionary logging code here) ...
+
         with open(SUMMARY_PATH, 'a') as f:
             f.write(json.dumps(row) + '\n')
+
+        # NEW: Clear Colab output and print an updated leaderboard immediately
+        try:
+            from google.colab import output
+            output.clear()  # Wipes the old wall of text clean
+        except ImportError:
+            pass
+
+        # Print the immediate Top Leaderboard right in place
+        if SUMMARY_PATH.exists():
+            rows = [json.loads(l) for l in open(SUMMARY_PATH)]
+            rows.sort(key=lambda r: r['hi_te_avg'], reverse=True)
+            print(f"\n── CURRENT TOP TRIALS (Updated {datetime.now().strftime('%H:%M:%S')}) ──")
+            print(f"{'#':<5} {'HI+TE avg':>10} {'English':>9} {'Hindi':>9} {'Telugu':>10} {'time(min)':>10}")
+            print('─' * 60)
+            for r in rows[:10]:
+                en = r.get('english_f1', 0.0)
+                hi = r.get('hindi_f1', 0.0)
+                te = r.get('telugu_f1', 0.0)
+                print(f"{r['trial']:<5} {r['hi_te_avg']:>10.4f} {en:>9.4f} {hi:>9.4f} {te:>10.4f} {r['elapsed_min']:>10.1f}")
+
+        return best_score
 
         return best_score  # ← this is what Optuna maximises
 
