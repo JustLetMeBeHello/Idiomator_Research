@@ -253,8 +253,10 @@ def compute_joint_f1(s1_preds, s2_preds, pred_label_key='pred_idiomaticity',
         all_pred.extend(p)
 
     prec, rec, f1, _ = precision_recall_fscore_support(all_gold, all_pred, average=None, labels=[0, 1], zero_division=0)
+    macro_avg_f1 = round(float(np.mean([per_lang[lang]['macro_f1'] for lang in sorted(lang_gold.keys())])), 4)
     per_lang['Overall'] = {
-        'macro_f1':  round(float(np.mean(f1)), 4),
+        'macro_f1':     round(float(np.mean(f1)), 4),   # pooled across all examples (majority-language weighted)
+        'macro_avg_f1': macro_avg_f1,                   # unweighted average of per-language macro F1s
         'literal':   {'P': round(prec[0],4), 'R': round(rec[0],4), 'F1': round(f1[0],4)},
         'idiomatic': {'P': round(prec[1],4), 'R': round(rec[1],4), 'F1': round(f1[1],4)},
     }
@@ -323,7 +325,7 @@ def evaluate_system_a(s1_mbert, s2_mbert):
     print(f"\n  Joint F1 breakdown:")
     for lang, d in joint_f1.items():
         if isinstance(d, dict):
-            print(f"    {lang:<10} macro={d['macro_f1']:.4f}  "
+            print(f"    {lang:<10} macro={d['macro_f1']:.4f}" + (f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else "") + "  "
                   f"literal: P={d['literal']['P']:.4f} R={d['literal']['R']:.4f} F1={d['literal']['F1']:.4f}  "
                   f"idiomatic: P={d['idiomatic']['P']:.4f} R={d['idiomatic']['R']:.4f} F1={d['idiomatic']['F1']:.4f}")
 
@@ -369,7 +371,7 @@ def evaluate_system_b(s1_gpt, s2_gpt):
     print(f"\n  Joint F1 breakdown:")
     for lang, d in joint_f1.items():
         if isinstance(d, dict):
-            print(f"    {lang:<10} macro={d['macro_f1']:.4f}  "
+            print(f"    {lang:<10} macro={d['macro_f1']:.4f}" + (f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else "") + "  "
                   f"literal: P={d['literal']['P']:.4f} R={d['literal']['R']:.4f} F1={d['literal']['F1']:.4f}  "
                   f"idiomatic: P={d['idiomatic']['P']:.4f} R={d['idiomatic']['R']:.4f} F1={d['idiomatic']['F1']:.4f}")
 
@@ -428,7 +430,7 @@ def evaluate_system_c(single_gpt):
     print(f"\n  Joint F1 breakdown:")
     for lang, d in joint_f1.items():
         if isinstance(d, dict):
-            print(f"    {lang:<10} macro={d['macro_f1']:.4f}  "
+            print(f"    {lang:<10} macro={d['macro_f1']:.4f}" + (f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else "") + "  "
                   f"literal: P={d['literal']['P']:.4f} R={d['literal']['R']:.4f} F1={d['literal']['F1']:.4f}  "
                   f"idiomatic: P={d['idiomatic']['P']:.4f} R={d['idiomatic']['R']:.4f} F1={d['idiomatic']['F1']:.4f}")
 
@@ -474,7 +476,7 @@ def evaluate_system_d(s1_mbert, span2_joint):
     print(f"\n  Joint F1 breakdown:")
     for lang, d in joint_f1.items():
         if isinstance(d, dict):
-            print(f"    {lang:<10} macro={d['macro_f1']:.4f}  "
+            print(f"    {lang:<10} macro={d['macro_f1']:.4f}" + (f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else "") + "  "
                   f"literal: P={d['literal']['P']:.4f} R={d['literal']['R']:.4f} F1={d['literal']['F1']:.4f}  "
                   f"idiomatic: P={d['idiomatic']['P']:.4f} R={d['idiomatic']['R']:.4f} F1={d['idiomatic']['F1']:.4f}")
 
@@ -536,7 +538,7 @@ def evaluate_system_e(joint_preds):
     print(f"\n  Joint F1 breakdown:")
     for lang, d in joint_f1.items():
         if isinstance(d, dict):
-            print(f"    {lang:<10} macro={d['macro_f1']:.4f}  "
+            print(f"    {lang:<10} macro={d['macro_f1']:.4f}" + (f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else "") + "  "
                   f"literal: P={d['literal']['P']:.4f} R={d['literal']['R']:.4f} F1={d['literal']['F1']:.4f}  "
                   f"idiomatic: P={d['idiomatic']['P']:.4f} R={d['idiomatic']['R']:.4f} F1={d['idiomatic']['F1']:.4f}")
 
@@ -594,7 +596,7 @@ def evaluate_system_f(seq_phase1, seq_phase2):
     print(f"\n  Joint F1 breakdown:")
     for lang, d in joint_f1.items():
         if isinstance(d, dict):
-            print(f"    {lang:<10} macro={d['macro_f1']:.4f}  "
+            print(f"    {lang:<10} macro={d['macro_f1']:.4f}" + (f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else "") + "  "
                   f"literal: P={d['literal']['P']:.4f} R={d['literal']['R']:.4f} F1={d['literal']['F1']:.4f}  "
                   f"idiomatic: P={d['idiomatic']['P']:.4f} R={d['idiomatic']['R']:.4f} F1={d['idiomatic']['F1']:.4f}")
 
@@ -715,7 +717,7 @@ def print_summary(results_a, results_b, results_c, results_d, results_e, results
     print("SUMMARY — Full Pipeline Comparison (Overall)")
     print("="*108)
     header = (f"{'System':<45} {'Cls F1':<10} {'E2E Span F1':<14} "
-              f"{'Corr-ID Span F1':<16} {'Joint Acc':<12} {'Joint F1':<10}")
+              f"{'Corr-ID Span F1':<16} {'Joint Acc':<12} {'Joint F1':<12} {'Joint F1 (macro-avg)':<20}")
     print(header)
     print("-" * len(header))
     for label, res in systems:
@@ -728,8 +730,9 @@ def print_summary(results_a, results_b, results_c, results_d, results_e, results
         jacc    = get(res, 'joint_acc')
         jf1_d   = get(res, 'joint_f1',        'Overall')
         jf1     = jf1_d.get('macro_f1') if isinstance(jf1_d, dict) else jf1_d
+        jf1_avg = jf1_d.get('macro_avg_f1') if isinstance(jf1_d, dict) else None
         note    = ' *' if res.get('cls_f1') is None else ''
-        print(f"{label+note:<45} {fmt(cls):<10} {fmt(e2e):<14} {fmt(corr):<16} {fmt(jacc):<12} {fmt(jf1):<10}")
+        print(f"{label+note:<45} {fmt(cls):<10} {fmt(e2e):<14} {fmt(corr):<16} {fmt(jacc):<12} {fmt(jf1):<12} {fmt(jf1_avg):<20}")
     print("  * System G has no classifier — Cls F1 and Joint metrics are span-only.")
 
     # ── Per-language Classification F1 ────────────────────────────────────────
@@ -781,7 +784,7 @@ def print_summary(results_a, results_b, results_c, results_d, results_e, results
             print(f"{label:<45} " + "".join(f"{'—':<14}" for _ in LANGS) + f"{'—':<10}")
             continue
         def jf_macro(d):
-            return d.get('macro_f1') if isinstance(d, dict) else d
+            return d.get('macro_avg_f1', d.get('macro_f1')) if isinstance(d, dict) else d
         row = f"{label:<45} " + "".join(f"{fmt(jf_macro(jf.get(l, '—'))):<14}" for l in LANGS)
         row += f"{fmt(jf_macro(jf.get('Overall', '—'))):<10}"
         print(row)

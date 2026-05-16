@@ -91,6 +91,7 @@
       },
       "Overall": {
         "macro_f1": 0.7223,
+        "macro_avg_f1": 0.696,
         "literal": {
           "P": 0.7449,
           "R": 0.7264,
@@ -196,6 +197,7 @@
       },
       "Overall": {
         "macro_f1": 0.7411,
+        "macro_avg_f1": 0.6854,
         "literal": {
           "P": 0.7696,
           "R": 0.7313,
@@ -301,6 +303,7 @@
       },
       "Overall": {
         "macro_f1": 0.7306,
+        "macro_avg_f1": 0.683,
         "literal": {
           "P": 0.7964,
           "R": 0.6617,
@@ -317,105 +320,106 @@
   "system_d_mbert_s1_joint_span": null,
   "system_e_joint_end_to_end": {
     "cls_f1": {
-      "English": 0.8058,
-      "Hindi": 0.6527,
-      "Telugu": 0.6856,
-      "Overall": 0.7625
+      "English": 0.7985,
+      "Hindi": 0.6905,
+      "Telugu": 0.7285,
+      "Overall": 0.7699
     },
     "span_e2e": {
       "exact": {
-        "English": 0.562,
-        "Hindi": 0.3333,
-        "Telugu": 0.4242,
-        "Overall": 0.5056
+        "English": 0.6033,
+        "Hindi": 0.2083,
+        "Telugu": 0.6061,
+        "Overall": 0.5506
       },
       "overlap": {
-        "English": 0.6778,
-        "Hindi": 0.6067,
-        "Telugu": 0.4731,
-        "Overall": 0.6303
+        "English": 0.707,
+        "Hindi": 0.5928,
+        "Telugu": 0.6924,
+        "Overall": 0.6889
       }
     },
     "span_idio": {
       "exact": {
-        "English": 0.7107,
-        "Hindi": 0.375,
+        "English": 0.7603,
+        "Hindi": 0.2917,
         "Telugu": 0.8182,
-        "Overall": 0.6854
+        "Overall": 0.7079
       },
       "overlap": {
-        "English": 0.8701,
-        "Hindi": 0.7745,
-        "Telugu": 0.9135,
-        "Overall": 0.8653
+        "English": 0.8953,
+        "Hindi": 0.7447,
+        "Telugu": 0.9308,
+        "Overall": 0.8816
       }
     },
     "span_correct_id": {
       "exact": {
-        "English": 0.7391,
-        "Hindi": 0.5,
-        "Telugu": 0.8235,
-        "Overall": 0.72
+        "English": 0.7766,
+        "Hindi": 0.2778,
+        "Telugu": 0.8,
+        "Overall": 0.7153
       },
       "overlap": {
-        "English": 0.8914,
-        "Hindi": 0.91,
-        "Telugu": 0.9184,
-        "Overall": 0.8975
+        "English": 0.91,
+        "Hindi": 0.7904,
+        "Telugu": 0.914,
+        "Overall": 0.895
       }
     },
-    "joint_acc": 0.6728,
+    "joint_acc": 0.6675,
     "joint_f1": {
       "English": {
-        "macro_f1": 0.7852,
+        "macro_f1": 0.7782,
         "literal": {
-          "P": 0.7687,
-          "R": 0.8496,
-          "F1": 0.8071
+          "P": 0.773,
+          "R": 0.8195,
+          "F1": 0.7956
         },
         "idiomatic": {
-          "P": 0.8131,
-          "R": 0.719,
-          "F1": 0.7632
+          "P": 0.7876,
+          "R": 0.7355,
+          "F1": 0.7607
         }
       },
       "Hindi": {
-        "macro_f1": 0.6527,
+        "macro_f1": 0.6718,
         "literal": {
-          "P": 0.7143,
+          "P": 0.7407,
           "R": 0.6452,
-          "F1": 0.678
+          "F1": 0.6897
         },
         "idiomatic": {
-          "P": 0.5926,
-          "R": 0.6667,
-          "F1": 0.6275
+          "P": 0.6071,
+          "R": 0.7083,
+          "F1": 0.6538
         }
       },
       "Telugu": {
-        "macro_f1": 0.6856,
+        "macro_f1": 0.7285,
         "literal": {
-          "P": 0.6667,
-          "R": 0.8649,
-          "F1": 0.7529
+          "P": 0.7647,
+          "R": 0.7027,
+          "F1": 0.7324
         },
         "idiomatic": {
-          "P": 0.7727,
-          "R": 0.5152,
-          "F1": 0.6182
+          "P": 0.6944,
+          "R": 0.7576,
+          "F1": 0.7246
         }
       },
       "Overall": {
-        "macro_f1": 0.7484,
+        "macro_f1": 0.7536,
+        "macro_avg_f1": 0.7262,
         "literal": {
-          "P": 0.7399,
-          "R": 0.8209,
-          "F1": 0.7783
+          "P": 0.7673,
+          "R": 0.7711,
+          "F1": 0.7692
         },
         "idiomatic": {
-          "P": 0.7692,
-          "R": 0.6742,
-          "F1": 0.7186
+          "P": 0.7401,
+          "R": 0.736,
+          "F1": 0.738
         }
       }
     }
@@ -512,6 +516,7 @@
       },
       "Overall": {
         "macro_f1": 0.7414,
+        "macro_avg_f1": 0.682,
         "literal": {
           "P": 0.7814,
           "R": 0.7114,

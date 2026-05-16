@@ -84,13 +84,13 @@ def parse_args():
     p.add_argument('--langs',           nargs='+', default=['English', 'Hindi', 'Telugu'])
     p.add_argument('--epochs',          type=int,   default=7)
     p.add_argument('--batch_size',      type=int,   default=32)
-    p.add_argument('--lr',              type=float, default=1e-5)
+    p.add_argument('--lr',              type=float, default=2e-05)
     p.add_argument('--max_len',         type=int,   default=128)
-    p.add_argument('--warmup_ratio',    type=float, default=0.1)
+    p.add_argument('--warmup_ratio',    type=float, default=0.05)
     p.add_argument('--seed',            type=int,   default=42)
-    p.add_argument('--cls_loss_weight', type=float, default=1.0,
+    p.add_argument('--cls_loss_weight', type=float, default=0.3,
                    help='Weight on classification loss term')
-    p.add_argument('--span_loss_weight',type=float, default=1.0,
+    p.add_argument('--span_loss_weight',type=float, default=1.9,
                    help='Weight on span extraction loss term')
     p.add_argument('--use_wandb',       action='store_true')
     p.add_argument('--device',          default=None)
