@@ -68,6 +68,7 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument('--model_name',         default='bert-base-multilingual-cased')
     p.add_argument('--data_dir',           default='idioms_structured/Splits')
+    p.add_argument('--dropout', type=float, default=0.1)
     p.add_argument('--output_dir',         default='models/sequential')
     p.add_argument('--langs',              nargs='+', default=['English', 'Hindi', 'Telugu'])
     p.add_argument('--phase',              type=int, default=0,

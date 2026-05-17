@@ -86,6 +86,7 @@ def sample_config(trial: optuna.Trial) -> dict:
     warmup_ratio = trial.suggest_categorical('warmup_ratio', [0.05, 0.06, 0.1, 0.15])
     batch_size   = trial.suggest_categorical('batch_size',   [16, 32])
     epochs       = trial.suggest_categorical('epochs',       [5, 7, 10])
+    dropout      = trial.suggest_float('dropout', 0.1, 0.3)
 
     return {
         'lr':               lr,
@@ -94,6 +95,7 @@ def sample_config(trial: optuna.Trial) -> dict:
         'warmup_ratio':     warmup_ratio,
         'batch_size':       batch_size,
         'epochs':           epochs,
+        'dropout':          round(dropout, 3),
     }
 
 
@@ -117,6 +119,7 @@ def run_trial(config: dict, trial_dir: Path, train_script: str) -> dict | None:
         '--warmup_ratio',     str(config['warmup_ratio']),
         '--batch_size',       str(config['batch_size']),
         '--epochs',           str(config['epochs']),
+        '--dropout',          str(config['dropout']),
     ]
 
     print(f"\n{'─'*70}")
@@ -259,7 +262,7 @@ def main():
         print(f"{'#':<5} {'dev_joint':>10} {'dev_cls':>9} {'test_span':>10} {'time(min)':>10}  config")
         print('─' * 90)
         for r in rows[:10]:
-            cfg_str = f"lr={r['config']['lr']}  cls={r['config']['cls_loss_weight']}  span={r['config']['span_loss_weight']}  bs={r['config']['batch_size']}  ep={r['config']['epochs']}"
+            cfg_str = f"lr={r['config']['lr']}  cls={r['config']['cls_loss_weight']}  span={r['config']['span_loss_weight']}  bs={r['config']['batch_size']}  ep={r['config']['epochs']}  drop={r['config'].get('dropout', '—')}"
             print(f"{r['trial']:<5} {r['dev_joint_f1']:>10.4f} {r['dev_cls_f1']:>9.4f} {r['test_span_f1']:>10.4f} {r['elapsed_min']:>10.1f}  {cfg_str}")
 
     # Importance analysis — which hyperparameter mattered most
