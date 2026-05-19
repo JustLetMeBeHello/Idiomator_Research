@@ -61,7 +61,7 @@ COMBOS = [
     ("en_es_hi_te", ["English", "Spanish", "Hindi", "Telugu"]),
 ]
 
-ALL_TEST_LANGS = ["English", "Spanish", "Hindi", "Telugu"]
+ALL_TEST_LANGS = ["English", "Spanish", "Hindi", "Telugu", "Indonesian"]
 SYSTEM = "stage1"
 
 

@@ -29,7 +29,7 @@ PYTHON="${PYTHON:-python3}"
 DATA_DIR="${DATA_DIR:-idioms_structured/Splits}"
 MODEL_NAME="${MODEL_NAME:-bert-base-multilingual-cased}"
 DEVICE="${DEVICE:-cuda}"
-TEST_LANGS="${TEST_LANGS:-English Spanish Hindi Telugu}"
+TEST_LANGS="${TEST_LANGS:-English Spanish Hindi Telugu Indonesian}"
 
 ABLATION_DIR="${ABLATION_DIR:-models/language_ablation_matrix}"
 EVAL_DIR="${EVAL_DIR:-results/language_ablation_matrix}"
