@@ -59,9 +59,13 @@ JOINT_SPAN_WEIGHT="${JOINT_SPAN_WEIGHT:-1.9}"
 SEQ_P1_LR="${SEQ_P1_LR:-1e-5}"
 SEQ_P1_EPOCHS="${SEQ_P1_EPOCHS:-7}"
 SEQ_P1_BATCH="${SEQ_P1_BATCH:-32}"
+SEQ_P1_CLS_WEIGHT="${SEQ_P1_CLS_WEIGHT:-0.7}"
+SEQ_P1_SPAN_WEIGHT="${SEQ_P1_SPAN_WEIGHT:-0.3}"
 SEQ_P2_LR="${SEQ_P2_LR:-3e-5}"
 SEQ_P2_EPOCHS="${SEQ_P2_EPOCHS:-5}"
 SEQ_P2_BATCH="${SEQ_P2_BATCH:-16}"
+SEQ_P2_CLS_WEIGHT="${SEQ_P2_CLS_WEIGHT:-0.3}"
+SEQ_P2_SPAN_WEIGHT="${SEQ_P2_SPAN_WEIGHT:-0.7}"
 SEQ_UNFREEZE_TOP="${SEQ_UNFREEZE_TOP:-3}"
 SEQ_DROPOUT="${SEQ_DROPOUT:-0.1}"
 
@@ -188,9 +192,13 @@ train_sequential() {
       --p1_epochs "$SEQ_P1_EPOCHS" \
       --p1_batch_size "$SEQ_P1_BATCH" \
       --p1_lr "$SEQ_P1_LR" \
+      --p1_cls_weight "$SEQ_P1_CLS_WEIGHT" \
+      --p1_span_weight "$SEQ_P1_SPAN_WEIGHT" \
       --p2_epochs "$SEQ_P2_EPOCHS" \
       --p2_batch_size "$SEQ_P2_BATCH" \
       --p2_lr "$SEQ_P2_LR" \
+      --p2_cls_weight "$SEQ_P2_CLS_WEIGHT" \
+      --p2_span_weight "$SEQ_P2_SPAN_WEIGHT" \
       --unfreeze_top_layers "$SEQ_UNFREEZE_TOP" \
       --dropout "$SEQ_DROPOUT" \
       --device "$DEVICE"

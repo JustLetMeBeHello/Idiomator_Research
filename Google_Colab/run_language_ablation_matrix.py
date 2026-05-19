@@ -59,7 +59,7 @@ ALL_TEST_LANGS = ["English", "Spanish", "Hindi", "Telugu"]
 @dataclass(frozen=True)
 class Job:
     combo: str
-    langs: list[str]
+    langs: tuple[str, ...]
     system: str
 
     @property
@@ -143,6 +143,19 @@ def expected_done(args: argparse.Namespace, job: Job) -> bool:
         "eval": [eval_base / "pipeline_eval_results.json"],
     }
     return all(p.exists() for p in paths[job.system])
+
+
+def checkpoint_done(args: argparse.Namespace, job: Job) -> bool:
+    """Fast-path resume: trust the sentinel JSON written by a previous run."""
+    path = checkpoint_path(args, job)
+    if not path.exists():
+        return False
+    try:
+        with path.open(encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("status") == "done"
+    except (json.JSONDecodeError, OSError):
+        return False
 
 
 def mark_done(args: argparse.Namespace, job: Job) -> None:
@@ -293,7 +306,7 @@ def build_jobs(args: argparse.Namespace) -> list[Job]:
         for system in systems:
             if args.only_system and system != args.only_system:
                 continue
-            jobs.append(Job(combo=combo, langs=langs, system=system))
+            jobs.append(Job(combo=combo, langs=tuple(langs), system=system))
     return jobs
 
 
@@ -325,7 +338,7 @@ def main() -> None:
     completed = 0
 
     for job in tqdm(jobs, desc="Ablation jobs", unit="job"):
-        if expected_done(args, job):
+        if checkpoint_done(args, job) or expected_done(args, job):
             mark_done(args, job)
             tqdm.write(f"✓ skip {job.name}")
             completed += 1
