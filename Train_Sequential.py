@@ -255,10 +255,11 @@ class JointDataset(Dataset):
 # ── Model ─────────────────────────────────────────────────────────────────────
 
 class JointIdiomModel(torch.nn.Module):
-    def __init__(self, model_name):
+    def __init__(self, model_name, dropout=0.1):
         super().__init__()
         self.bert       = AutoModel.from_pretrained(model_name)
         hidden_size     = self.bert.config.hidden_size
+        self.drop       = torch.nn.Dropout(dropout)
         self.cls_head   = torch.nn.Linear(hidden_size, 2)
         self.start_head = torch.nn.Linear(hidden_size, 1)
         self.end_head   = torch.nn.Linear(hidden_size, 1)
@@ -266,7 +267,7 @@ class JointIdiomModel(torch.nn.Module):
     def forward(self, input_ids, attention_mask, token_type_ids):
         outputs      = self.bert(input_ids=input_ids, attention_mask=attention_mask,
                                  token_type_ids=token_type_ids)
-        seq_output   = outputs.last_hidden_state
+        seq_output   = self.drop(outputs.last_hidden_state)
         cls_output   = seq_output[:, 0, :]
         cls_logits   = self.cls_head(cls_output)
         start_logits = self.start_head(seq_output).squeeze(-1)
@@ -330,9 +331,9 @@ def save_model(model, tokenizer, output_dir):
     }, best / 'task_heads.pt')
 
 
-def load_model(model_name, output_dir, device):
+def load_model(model_name, output_dir, device, dropout=0.1):
     best  = Path(output_dir) / 'best_model'
-    model = JointIdiomModel(model_name)
+    model = JointIdiomModel(model_name, dropout=dropout)
     model.bert = AutoModel.from_pretrained(best)
     heads = torch.load(best / 'task_heads.pt', map_location='cpu')
     model.cls_head.load_state_dict(heads['cls_head'])
@@ -559,7 +560,7 @@ def phase1(args, device, tokenizer, train_ds, dev_ds, test_ds):
     dev_loader   = DataLoader(dev_ds,   batch_size=args.p1_batch_size)
     test_loader  = DataLoader(test_ds,  batch_size=args.p1_batch_size)
 
-    model       = JointIdiomModel(args.model_name).to(device)
+    model       = JointIdiomModel(args.model_name, dropout=args.dropout).to(device)
     cls_weights = compute_cls_loss_weights(train_ds.valid_examples, device)
     cls_crit    = torch.nn.CrossEntropyLoss(weight=cls_weights)
     span_crit   = torch.nn.CrossEntropyLoss()
@@ -589,7 +590,7 @@ def phase1(args, device, tokenizer, train_ds, dev_ds, test_ds):
 
     # Test evaluation
     print("\n[Phase 1] Loading best model for test evaluation...")
-    best_model = load_model(args.model_name, output_dir, device)
+    best_model = load_model(args.model_name, output_dir, device, dropout=args.dropout)
     test_cls_f1, test_exact, test_overlap = evaluate(
         best_model, test_loader, tokenizer, test_ds.valid_examples,
         device, 'Test Phase 1', args.max_len
@@ -635,7 +636,7 @@ def phase2(args, device, tokenizer, train_ds, dev_ds, test_ds, phase1_dir):
 
     # Load Phase 1 weights as starting point
     print(f"\n[Phase 2] Loading Phase 1 weights from {phase1_dir}...")
-    model = load_model(args.model_name, phase1_dir, device)
+    model = load_model(args.model_name, phase1_dir, device, dropout=args.dropout)
 
     # Freeze bottom layers and cls head; unfreeze top N layers and span heads
     freeze_for_phase2(model, args.unfreeze_top_layers)
@@ -671,7 +672,7 @@ def phase2(args, device, tokenizer, train_ds, dev_ds, test_ds, phase1_dir):
 
     # Test evaluation
     print("\n[Phase 2] Loading best model for test evaluation...")
-    best_model = load_model(args.model_name, output_dir, device)
+    best_model = load_model(args.model_name, output_dir, device, dropout=args.dropout)
     test_cls_f1, test_exact, test_overlap = evaluate(
         best_model, test_loader, tokenizer, test_ds.valid_examples,
         device, 'Test Phase 2', args.max_len

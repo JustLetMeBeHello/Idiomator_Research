@@ -63,6 +63,7 @@ SEQ_P2_LR="${SEQ_P2_LR:-3e-5}"
 SEQ_P2_EPOCHS="${SEQ_P2_EPOCHS:-5}"
 SEQ_P2_BATCH="${SEQ_P2_BATCH:-16}"
 SEQ_UNFREEZE_TOP="${SEQ_UNFREEZE_TOP:-3}"
+SEQ_DROPOUT="${SEQ_DROPOUT:-0.1}"
 
 BIO_LR="${BIO_LR:-3.27e-5}"
 BIO_EPOCHS="${BIO_EPOCHS:-6}"
@@ -191,6 +192,7 @@ train_sequential() {
       --p2_batch_size "$SEQ_P2_BATCH" \
       --p2_lr "$SEQ_P2_LR" \
       --unfreeze_top_layers "$SEQ_UNFREEZE_TOP" \
+      --dropout "$SEQ_DROPOUT" \
       --device "$DEVICE"
 }
 

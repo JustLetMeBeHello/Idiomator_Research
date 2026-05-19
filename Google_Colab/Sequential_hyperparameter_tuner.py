@@ -214,7 +214,10 @@ class JointDataset(Dataset):
             )
             cls_label = LABEL2ID[ex['idiomaticity']]
             token_start, token_end = char_to_token_span(
-                tokenizer(ex['sentence'], max_length=max_len, truncation=True),
+                tokenizer(
+                    ex['sentence'], max_length=max_len, truncation=True,
+                    return_offsets_mapping=True,
+                ),
                 ex['span_start'], ex['span_end'], ex['sentence']
             )
             if token_start is None:
@@ -263,7 +266,8 @@ class JointIdiomModel(torch.nn.Module):
         hidden_size    = self.bert.config.hidden_size
         self.drop      = torch.nn.Dropout(dropout)
         self.cls_head  = torch.nn.Linear(hidden_size, 2)
-        self.span_head = torch.nn.Linear(hidden_size, 2)
+        self.start_head = torch.nn.Linear(hidden_size, 1)
+        self.end_head   = torch.nn.Linear(hidden_size, 1)
 
     def forward(self, input_ids, attention_mask, token_type_ids):
         out     = self.bert(input_ids=input_ids, attention_mask=attention_mask,
@@ -271,12 +275,16 @@ class JointIdiomModel(torch.nn.Module):
         pooled  = self.drop(out.last_hidden_state[:, 0, :])
         seq     = self.drop(out.last_hidden_state)
         cls_logits  = self.cls_head(pooled)
-        span_logits = self.span_head(seq)
-        return cls_logits, span_logits
+        start_logits = self.start_head(seq).squeeze(-1)
+        end_logits   = self.end_head(seq).squeeze(-1)
+        mask = attention_mask.bool()
+        start_logits = start_logits.masked_fill(~mask, float('-inf'))
+        end_logits   = end_logits.masked_fill(~mask, float('-inf'))
+        return cls_logits, start_logits, end_logits
 
 
 def freeze_for_phase2(model, unfreeze_top_layers):
-    """Freeze all encoder layers and cls head; unfreeze top N layers + span head."""
+    """Freeze all encoder layers and cls head; unfreeze top N layers + span heads."""
     for param in model.parameters():
         param.requires_grad = False
     # Unfreeze top N transformer layers
@@ -285,8 +293,10 @@ def freeze_for_phase2(model, unfreeze_top_layers):
     for layer_idx in range(n_layers - unfreeze_top_layers, n_layers):
         for param in encoder_layers[layer_idx].parameters():
             param.requires_grad = True
-    # Always unfreeze span head
-    for param in model.span_head.parameters():
+    # Always unfreeze span heads
+    for param in model.start_head.parameters():
+        param.requires_grad = True
+    for param in model.end_head.parameters():
         param.requires_grad = True
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total     = sum(p.numel() for p in model.parameters())
@@ -296,36 +306,45 @@ def freeze_for_phase2(model, unfreeze_top_layers):
 def save_model(model, tokenizer, output_dir):
     path = Path(output_dir) / 'best_model'
     path.mkdir(parents=True, exist_ok=True)
-    torch.save(model.state_dict(), path / 'pytorch_model.bin')
+    model.bert.save_pretrained(path)
     tokenizer.save_pretrained(path)
+    torch.save({
+        'cls_head':   model.cls_head.state_dict(),
+        'start_head': model.start_head.state_dict(),
+        'end_head':   model.end_head.state_dict(),
+    }, path / 'task_heads.pt')
 
 
 def load_model(model_name, output_dir, device, dropout=0.1):
-    model = JointIdiomModel(model_name, dropout=dropout).to(device)
-    state = torch.load(Path(output_dir) / 'best_model' / 'pytorch_model.bin',
-                       map_location=device)
-    model.load_state_dict(state)
-    return model
+    best = Path(output_dir) / 'best_model'
+    model = JointIdiomModel(model_name, dropout=dropout)
+    model.bert = AutoModel.from_pretrained(best)
+    heads = torch.load(best / 'task_heads.pt', map_location='cpu')
+    model.cls_head.load_state_dict(heads['cls_head'])
+    model.start_head.load_state_dict(heads['start_head'])
+    model.end_head.load_state_dict(heads['end_head'])
+    return model.to(device)
 
 
 # ── Eval ───────────────────────────────────────────────────────────────────────
 
 def evaluate_dev(model, loader, tokenizer, examples, device, max_len):
-    """Returns cls macro F1, span overlap F1, and per-language joint F1."""
+    """Returns cls macro F1 and per-language joint macro F1."""
     model.eval()
     all_cls_gold, all_cls_pred = [], []
-    lang_joint = defaultdict(list)
+    lang_joint_gold = defaultdict(list)
+    lang_joint_pred = defaultdict(list)
 
     with torch.no_grad():
         for batch_idx, batch in enumerate(loader):
-            cls_logits, span_logits = model(
+            cls_logits, start_logits, end_logits = model(
                 batch['input_ids'].to(device),
                 batch['attention_mask'].to(device),
                 batch['token_type_ids'].to(device),
             )
             cls_preds   = torch.argmax(cls_logits, dim=-1).cpu().tolist()
-            start_preds = torch.argmax(span_logits[:, :, 0], dim=-1).cpu().tolist()
-            end_preds   = torch.argmax(span_logits[:, :, 1], dim=-1).cpu().tolist()
+            start_preds = torch.argmax(start_logits, dim=-1).cpu().tolist()
+            end_preds   = torch.argmax(end_logits, dim=-1).cpu().tolist()
 
             for i in range(len(cls_preds)):
                 ex_idx = batch_idx * loader.batch_size + i
@@ -337,27 +356,40 @@ def evaluate_dev(model, loader, tokenizer, examples, device, max_len):
                 all_cls_gold.append(gold_cls)
                 all_cls_pred.append(pred_cls)
 
-                # Joint F1 logic
+                # Joint macro-F1 logic matching Evaluation/Full_evaluation.py:
+                # literals are class 0; idiomatic examples require correct cls
+                # and any span overlap to count as class 1.
                 gold_s, gold_e = ex['span_start'], ex['span_end']
                 if gold_cls == LABEL2ID['literal']:
-                    joint_correct = int(pred_cls == LABEL2ID['literal'])
+                    gold_joint = 0
+                    pred_joint = 0 if pred_cls == LABEL2ID['literal'] else 1
                 else:
+                    gold_joint = 1
                     if pred_cls != LABEL2ID['idiomatic']:
-                        joint_correct = 0
+                        pred_joint = 0
                     else:
+                        pred_start = start_preds[i]
+                        pred_end = end_preds[i]
+                        if pred_end < pred_start:
+                            pred_end = pred_start
                         ps, pe = token_to_char_span(
                             tokenizer, ex['sentence'],
-                            start_preds[i], end_preds[i], max_len
+                            pred_start, pred_end, max_len
                         )
                         if ps is None:
-                            joint_correct = 0
+                            pred_joint = 0
                         else:
                             f1 = compute_overlap_f1(ps, pe, gold_s, gold_e)
-                            joint_correct = int(f1 > 0.0)
-                lang_joint[ex['language']].append(joint_correct)
+                            pred_joint = 1 if f1 > 0.0 else 0
+                lang_joint_gold[ex['language']].append(gold_joint)
+                lang_joint_pred[ex['language']].append(pred_joint)
 
     cls_f1   = f1_score(all_cls_gold, all_cls_pred, average='macro', zero_division=0)
-    per_lang_joint = {l: float(np.mean(v)) for l, v in lang_joint.items()}
+    per_lang_joint = {
+        l: float(f1_score(lang_joint_gold[l], lang_joint_pred[l],
+                          average='macro', zero_division=0))
+        for l in lang_joint_gold
+    }
     hi_te_joint = float(np.mean([
         per_lang_joint.get('Hindi', 0.0),
         per_lang_joint.get('Telugu', 0.0),
@@ -385,17 +417,17 @@ def train_phase(
     for epoch in range(1, n_epochs + 1):
         model.train()
         for batch in tqdm(train_loader, desc=f"  {phase_label} E{epoch}", leave=False):
-            cls_logits, span_logits = model(
+            cls_logits, start_logits, end_logits = model(
                 batch['input_ids'].to(device),
                 batch['attention_mask'].to(device),
                 batch['token_type_ids'].to(device),
             )
             cls_loss  = cls_criterion(cls_logits, batch['cls_label'].to(device))
             start_loss = span_criterion(
-                span_logits[:, :, 0], batch['start_position'].to(device)
+                start_logits, batch['start_position'].to(device)
             )
             end_loss = span_criterion(
-                span_logits[:, :, 1], batch['end_position'].to(device)
+                end_logits, batch['end_position'].to(device)
             )
             span_loss = (start_loss + end_loss) / 2
             loss = cls_loss_weight * cls_loss + span_loss_weight * span_loss
@@ -556,7 +588,9 @@ def main():
     # ── SQLite-backed study ────────────────────────────────────────────────────
     db_path    = output_dir / 'study.db'
     storage    = f'sqlite:///{db_path}'
-    study_name = 'sequential_hparam'
+    # v2 avoids mixing older trials that used a different model-head layout and
+    # optimized joint correctness rate rather than joint macro F1.
+    study_name = 'sequential_hparam_v2_joint_macro_f1'
 
     print(f"\nOptuna DB: {db_path}")
     print("Resuming." if db_path.exists() else "Starting new study.")
@@ -608,11 +642,14 @@ def main():
     print("\nBest config as CLI args for train_sequential.py:")
     print(f"  --p1_lr {p['p1_lr']:.2e} --p1_batch_size {p['p1_batch_size']} "
           f"--p1_epochs {p['p1_epochs']} --p1_warmup_ratio {p['p1_warmup_ratio']:.3f} "
-          f"--p1_cls_weight {p['p1_cls_weight']:.2f} \\")
+          f"--p1_cls_weight {p['p1_cls_weight']:.2f} "
+          f"--p1_span_weight {1 - p['p1_cls_weight']:.2f} \\")
     print(f"  --p2_lr {p['p2_lr']:.2e} --p2_batch_size {p['p2_batch_size']} "
           f"--p2_epochs {p['p2_epochs']} --p2_warmup_ratio {p['p2_warmup_ratio']:.3f} "
+          f"--p2_cls_weight {1 - p['p2_span_weight']:.2f} "
           f"--p2_span_weight {p['p2_span_weight']:.2f} "
-          f"--unfreeze_top_layers {p['unfreeze_top_layers']}")
+          f"--unfreeze_top_layers {p['unfreeze_top_layers']} "
+          f"--dropout {p['dropout']:.3f}")
 
 
 if __name__ == '__main__':
