@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IdiomBank Validator</title>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+ 
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+ 
+  :root {
+    --bg: #0f0f10;
+    --surface: #18181b;
+    --surface2: #222226;
+    --border: #2e2e34;
+    --accent: #6ee7b7;
+    --accent2: #f59e0b;
+    --danger: #f87171;
+    --text: #e4e4e7;
+    --muted: #71717a;
+    --idiomatic: #6ee7b7;
+    --literal: #93c5fd;
+    --highlight-bg: rgba(110,231,183,0.18);
+    --highlight-border: #6ee7b7;
+  }
+ 
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 15px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+ 
+  /* ── Top bar ── */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 28px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+  }
+  .progress-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .progress-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+  .progress-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .lang-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 3px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+ 
+  /* ── Main layout ── */
+  .main {
+    flex: 1;
+    max-width: 860px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 40px 28px 80px;
+  }
+ 
+  /* ── Upload screen ── */
+  .upload-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 70vh;
+    gap: 24px;
+    text-align: center;
+  }
+  .upload-title {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .upload-title span { color: var(--accent); }
+  .upload-sub {
+    color: var(--muted);
+    font-size: 14px;
+    max-width: 400px;
+    line-height: 1.6;
+  }
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 48px 64px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    width: 100%;
+    max-width: 480px;
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: rgba(110,231,183,0.04); }
+  .upload-zone input { display: none; }
+  .upload-icon { font-size: 40px; margin-bottom: 16px; }
+  .upload-zone p { color: var(--muted); font-size: 14px; }
+  .upload-zone strong { color: var(--accent); }
+ 
+  /* ── Filter bar ── */
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 6px 14px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .filter-btn.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 500; }
+ 
+  /* ── Card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    margin-bottom: 20px;
+  }
+ 
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    gap: 16px;
+  }
+  .idiom-name {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--accent);
+  }
+  .meta-tags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+  }
+  .tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .tag.idiomatic { border-color: var(--idiomatic); color: var(--idiomatic); }
+  .tag.literal   { border-color: var(--literal);   color: var(--literal);   }
+ 
+  .example-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+ 
+  /* ── Sentence display ── */
+  .sentence-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 22px;
+    font-size: 17px;
+    line-height: 1.7;
+    margin-bottom: 24px;
+    letter-spacing: 0.01em;
+  }
+  .span-highlight {
+    background: var(--highlight-bg);
+    border-bottom: 2px solid var(--highlight-border);
+    border-radius: 2px;
+    padding: 1px 2px;
+    color: var(--accent);
+    font-weight: 500;
+  }
+ 
+  /* ── Validation sections ── */
+  .section-label {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+ 
+  /* Idiomaticity toggle */
+  .idio-toggle {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .idio-btn {
+    flex: 1;
+    padding: 14px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+  .idio-btn:hover { border-color: var(--muted); color: var(--text); }
+  .idio-btn.selected-idiomatic {
+    border-color: var(--idiomatic);
+    background: rgba(110,231,183,0.08);
+    color: var(--idiomatic);
+  }
+  .idio-btn.selected-literal {
+    border-color: var(--literal);
+    background: rgba(147,197,253,0.08);
+    color: var(--literal);
+  }
+ 
+  /* Span validator */
+  .span-section { margin-bottom: 24px; }
+  .span-display {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+  .span-btns {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .span-btn {
+    padding: 8px 18px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .span-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .span-btn.active-correct {
+    border-color: var(--accent);
+    background: rgba(110,231,183,0.1);
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .span-btn.active-wrong {
+    border-color: var(--danger);
+    background: rgba(248,113,113,0.1);
+    color: var(--danger);
+    font-weight: 500;
+  }
+ 
+  .correction-area {
+    display: none;
+  }
+  .correction-area.visible { display: block; }
+  .correction-area label {
+    font-size: 13px;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .correction-area textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 10px 12px;
+    resize: vertical;
+    min-height: 60px;
+    transition: border-color 0.15s;
+  }
+  .correction-area textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+ 
+  /* Notes */
+  .notes-area {
+    margin-bottom: 24px;
+  }
+  .notes-area textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    padding: 10px 12px;
+    resize: vertical;
+    min-height: 50px;
+    transition: border-color 0.15s;
+  }
+  .notes-area textarea:focus {
+    outline: none;
+    border-color: var(--muted);
+  }
+  .notes-area textarea::placeholder { color: var(--muted); }
+ 
+  /* ── Action buttons ── */
+  .actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+  .btn {
+    padding: 11px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: none;
+  }
+  .btn-skip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .btn-skip:hover { color: var(--text); border-color: var(--muted); }
+  .btn-submit {
+    background: var(--accent);
+    color: #000;
+  }
+  .btn-submit:hover { background: #34d399; }
+  .btn-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+ 
+  /* ── Done screen ── */
+  .done-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    gap: 20px;
+    text-align: center;
+  }
+  .done-screen.visible { display: flex; }
+  .done-icon { font-size: 56px; }
+  .done-title { font-size: 26px; font-weight: 600; }
+  .done-sub { color: var(--muted); font-size: 14px; }
+  .btn-export {
+    background: var(--accent);
+    color: #000;
+    padding: 12px 28px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    margin-top: 8px;
+  }
+  .btn-export:hover { background: #34d399; }
+ 
+  /* ── Stats panel ── */
+  .stats-panel {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  .stat-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 20px;
+    flex: 1;
+    min-width: 120px;
+  }
+  .stat-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--accent);
+  }
+  .stat-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+ 
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+ 
+<!-- Top bar -->
+<div class="topbar">
+  <div class="logo">IDIOMBANK / VALIDATOR</div>
+  <div class="progress-wrap">
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    <div class="progress-label" id="progressLabel">0 / 0</div>
+  </div>
+  <div class="lang-badge" id="langBadge">—</div>
+</div>
+
+ 
+<div class="main">
+ <div class="card" id="loginCard" style="max-width:500px;margin:40px auto;">
+  <div class="section-label">Annotator Login</div>
+
+  <input
+    type="text"
+    id="annotatorName"
+    placeholder="Enter your name"
+    style="
+      width:100%;
+      padding:12px;
+      background:var(--surface2);
+      border:1px solid var(--border);
+      border-radius:8px;
+      color:var(--text);
+      margin-bottom:16px;
+    "
+  >
+
+  <button class="btn btn-submit" onclick="startSession()">
+    Start Annotation Session
+  </button>
+</div>
+  <!-- Upload screen -->
+  <div class="upload-screen hidden" id="uploadScreen">
+    <div>
+      <div class="upload-title">IdiomBank <span>Validator</span></div>
+      <div class="upload-sub" style="margin-top:8px">Validate idiomaticity labels and span annotations for the dataset test set.</div>
+    </div>
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" id="fileInput" accept=".jsonl,.json">
+      <div class="upload-icon">📂</div>
+      <p><strong>Click to upload</strong> your test.jsonl file</p>
+      <p style="margin-top:6px;font-size:13px">or drag and drop</p>
+    </div>
+    <div style="color:var(--muted);font-size:13px">Session progress is auto-saved to localStorage</div>
+  </div>
+ 
+  <!-- Validator screen -->
+  <div id="validatorScreen" class="hidden">
+ 
+    <!-- Stats -->
+    <div class="stats-panel">
+      <div class="stat-box">
+        <div class="stat-val" id="statDone">0</div>
+        <div class="stat-label">Validated</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" id="statCorrect">0</div>
+        <div class="stat-label">Label correct</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" id="statSpanOk">0</div>
+        <div class="stat-label">Span correct</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" id="statChanged">0</div>
+        <div class="stat-label">Corrections</div>
+      </div>
+    </div>
+ 
+    <!-- Filters -->
+    <div class="filter-bar" id="filterBar"></div>
+ 
+    <!-- Main card -->
+    <div class="card" id="mainCard">
+      <div class="card-header">
+        <div>
+          <div class="idiom-name" id="idiomName">—</div>
+          <div class="meta-tags" id="metaTags"></div>
+        </div>
+        <div class="example-num" id="exampleNum">#1</div>
+      </div>
+ 
+      <div class="sentence-box" id="sentenceBox"></div>
+ 
+      <!-- Idiomaticity -->
+      <div class="section-label">Idiomaticity label</div>
+      <div class="idio-toggle">
+        <div class="idio-btn" id="btnIdiomatic" onclick="selectIdio('idiomatic')">🔀 Idiomatic</div>
+        <div class="idio-btn" id="btnLiteral"   onclick="selectIdio('literal')">📖 Literal</div>
+      </div>
+ 
+      <!-- Span -->
+      <div class="span-section">
+        <div class="section-label">Span annotation</div>
+        <div class="span-display" id="spanDisplay">—</div>
+        <div class="span-btns">
+          <button class="span-btn" id="spanCorrectBtn" onclick="selectSpan(true)">✓ Span correct</button>
+          <button class="span-btn" id="spanWrongBtn"   onclick="selectSpan(false)">✗ Span wrong</button>
+        </div>
+        <div class="correction-area" id="correctionArea">
+          <label>Correct span text (copy from sentence above):</label>
+          <textarea id="correctionText" placeholder="e.g. kick the bucket"></textarea>
+        </div>
+      </div>
+ 
+      <!-- Notes -->
+      <div class="notes-area">
+        <div class="section-label">Notes (optional)</div>
+        <textarea id="notesText" placeholder="Any observations about this example..."></textarea>
+      </div>
+ 
+      <div class="actions">
+        <button class="btn btn-skip" onclick="skipExample()">Skip</button>
+        <button class="btn btn-submit" id="submitBtn" onclick="submitExample()" disabled>Save &amp; Next →</button>
+      </div>
+    </div>
+ 
+  </div>
+ 
+  <!-- Done screen -->
+  <div class="done-screen" id="doneScreen">
+    <div class="done-icon">✅</div>
+    <div class="done-title">Validation complete</div>
+    <div class="done-sub" id="doneSub">All examples reviewed.</div>
+    <button class="btn-export" onclick="exportResults()">Export results.jsonl</button>
+    <button class="btn-export" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);margin-top:0" onclick="exportSummary()">Export summary.json</button>
+  </div>
+ 
+</div>
+ 
+<script>
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let allExamples = [];
+let filteredExamples = [];
+let currentIdx = 0;
+let results = {};        // keyed by meaning_id
+let filterLang = 'All';
+let annotator = localStorage.getItem('annotator') || '';
+let sessionId = crypto.randomUUID();
+let exampleStartTime = null;
+const STORAGE_KEY = 'idiombank_validator_v1';
+ 
+// ── Persistence ───────────────────────────────────────────────────────────────
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      results,
+      allExamples,
+      filterLang,
+      currentIdx,
+    }));
+  } catch(e) {}
+}
+ 
+function loadState() {
+  try {
+    const s = localStorage.getItem(STORAGE_KEY);
+    if (!s) return false;
+    const d = JSON.parse(s);
+    results      = d.results      || {};
+    allExamples  = d.allExamples  || [];
+    filterLang   = d.filterLang   || 'All';
+    if (allExamples.length) {
+      applyFilter(filterLang, false);
+      // Jump to first unvalidated
+      currentIdx = filteredExamples.findIndex(e => !results[e.meaning_id]);
+      if (currentIdx < 0) currentIdx = filteredExamples.length;
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+ function startSession() {
+  const input = document.getElementById('annotatorName');
+
+  annotator = input.value.trim();
+
+  if (!annotator) {
+    alert('Please enter your name');
+    return;
+  }
+
+  localStorage.setItem('annotator', annotator);
+
+  document.getElementById('loginCard').classList.add('hidden');
+  document.getElementById('uploadScreen').classList.remove('hidden');
+}
+// ── Upload ────────────────────────────────────────────────────────────────────
+document.getElementById('uploadZone').addEventListener('click', () => {
+  document.getElementById('fileInput').click();
+});
+document.getElementById('fileInput').addEventListener('change', e => {
+  readFile(e.target.files[0]);
+});
+document.getElementById('uploadZone').addEventListener('dragover', e => {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag');
+});
+document.getElementById('uploadZone').addEventListener('dragleave', e => {
+  e.currentTarget.classList.remove('drag');
+});
+document.getElementById('uploadZone').addEventListener('drop', e => {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag');
+  readFile(e.dataTransfer.files[0]);
+});
+ 
+function readFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const lines = ev.target.result.trim().split('\n');
+    allExamples = lines.map(l => JSON.parse(l));
+    results = {};
+    filterLang = 'All';
+    applyFilter('All');
+    currentIdx = 0;
+    showValidator();
+    saveState();
+  };
+  reader.readAsText(file);
+}
+ 
+// ── Filter ────────────────────────────────────────────────────────────────────
+function applyFilter(lang, render = true) {
+  filterLang = lang;
+  filteredExamples = lang === 'All'
+    ? allExamples
+    : allExamples.filter(e => e.language === lang);
+  if (render) {
+    renderFilterBar();
+    updateProgress();
+  }
+}
+ 
+function renderFilterBar() {
+  const langs = ['All', ...new Set(allExamples.map(e => e.language))];
+  const bar = document.getElementById('filterBar');
+  bar.innerHTML = langs.map(l => {
+    const count = l === 'All' ? allExamples.length : allExamples.filter(e => e.language === l).length;
+    const done  = l === 'All'
+      ? Object.keys(results).length
+      : allExamples.filter(e => e.language === l && results[e.meaning_id]).length;
+    return `<button class="filter-btn ${filterLang === l ? 'active' : ''}"
+      onclick="switchFilter('${l}')">${l} <span style="opacity:0.6">${done}/${count}</span></button>`;
+  }).join('');
+}
+ 
+function switchFilter(lang) {
+  applyFilter(lang);
+  currentIdx = filteredExamples.findIndex(e => !results[e.meaning_id]);
+  if (currentIdx < 0) currentIdx = filteredExamples.length;
+  renderExample();
+  saveState();
+}
+ 
+// ── Show/hide screens ─────────────────────────────────────────────────────────
+function showValidator() {
+  document.getElementById('uploadScreen').classList.add('hidden');
+  document.getElementById('doneScreen').classList.remove('visible');
+  document.getElementById('validatorScreen').classList.remove('hidden');
+  renderFilterBar();
+  renderExample();
+}
+ 
+// ── Render example ────────────────────────────────────────────────────────────
+let selectedIdio = null;
+let selectedSpan = null;
+ 
+function renderExample() {
+  selectedIdio = null;
+  selectedSpan = null;
+ 
+  if (currentIdx >= filteredExamples.length) {
+    showDone();
+    return;
+  }
+ 
+  const ex = filteredExamples[currentIdx];
+  exampleStartTime = Date.now();
+  // If already validated, load existing result
+  const existing = results[ex.meaning_id];
+ 
+  document.getElementById('idiomName').textContent = ex.idiom;
+  document.getElementById('exampleNum').textContent =
+    `#${currentIdx + 1} of ${filteredExamples.length}`;
+ 
+  // Meta tags
+  const tags = document.getElementById('metaTags');
+  const idioBadge = ex.idiomaticity === 'idiomatic'
+    ? `<span class="tag idiomatic">idiomatic</span>`
+    : `<span class="tag literal">literal</span>`;
+  const reg = (ex.register||[]).map(r => `<span class="tag">${r}</span>`).join('');
+  tags.innerHTML = idioBadge + reg;
+ 
+  // Sentence with highlighted span
+  document.getElementById('sentenceBox').innerHTML = highlightSpan(
+    ex.sentence, ex.span_start, ex.span_end
+  );
+ 
+  // Span display
+  document.getElementById('spanDisplay').textContent =
+    `"${ex.matched_span || ex.sentence.slice(ex.span_start, ex.span_end)}"  [${ex.span_start}:${ex.span_end}]`;
+ 
+  // Lang badge
+  document.getElementById('langBadge').textContent = ex.language;
+ 
+  // Reset UI
+  document.getElementById('btnIdiomatic').className = 'idio-btn';
+  document.getElementById('btnLiteral').className   = 'idio-btn';
+  document.getElementById('spanCorrectBtn').className = 'span-btn';
+  document.getElementById('spanWrongBtn').className   = 'span-btn';
+  document.getElementById('correctionArea').classList.remove('visible');
+  document.getElementById('correctionText').value = '';
+  document.getElementById('notesText').value = '';
+  document.getElementById('submitBtn').disabled = true;
+ 
+  if (existing) {
+    selectIdio(existing.idiomaticity_verdict, false);
+    selectSpan(existing.span_correct, false);
+    if (!existing.span_correct && existing.span_correction) {
+      document.getElementById('correctionText').value = existing.span_correction;
+    }
+    document.getElementById('notesText').value = existing.notes || '';
+  } else {
+    // Pre-select existing label as default
+    selectIdio(ex.idiomaticity, false);
+  }
+ 
+  updateProgress();
+}
+ 
+function highlightSpan(sentence, start, end) {
+  const before = escHtml(sentence.slice(0, start));
+  const span   = escHtml(sentence.slice(start, end));
+  const after  = escHtml(sentence.slice(end));
+  return `${before}<span class="span-highlight">${span}</span>${after}`;
+}
+ 
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+ 
+// ── Selections ────────────────────────────────────────────────────────────────
+function selectIdio(val, checkReady = true) {
+  selectedIdio = val;
+  document.getElementById('btnIdiomatic').className =
+    'idio-btn' + (val === 'idiomatic' ? ' selected-idiomatic' : '');
+  document.getElementById('btnLiteral').className =
+    'idio-btn' + (val === 'literal' ? ' selected-literal' : '');
+  if (checkReady) checkCanSubmit();
+}
+ 
+function selectSpan(correct, checkReady = true) {
+  selectedSpan = correct;
+  document.getElementById('spanCorrectBtn').className =
+    'span-btn' + (correct === true  ? ' active-correct' : '');
+  document.getElementById('spanWrongBtn').className =
+    'span-btn' + (correct === false ? ' active-wrong'   : '');
+  const ca = document.getElementById('correctionArea');
+  if (correct === false) ca.classList.add('visible');
+  else ca.classList.remove('visible');
+  if (checkReady) checkCanSubmit();
+}
+ 
+function checkCanSubmit() {
+  const ready = selectedIdio !== null && selectedSpan !== null;
+  document.getElementById('submitBtn').disabled = !ready;
+}
+ 
+// ── Submit / skip ─────────────────────────────────────────────────────────────
+async function submitExample() {
+  const ex = filteredExamples[currentIdx];
+
+  const originalIdio = ex.idiomaticity;
+  const spanCorrect  = selectedSpan;
+  const correction   = document.getElementById('correctionText').value.trim();
+  const notes        = document.getElementById('notesText').value.trim();
+
+  const annotationTimeSeconds =
+    ((Date.now() - exampleStartTime) / 1000).toFixed(2);
+
+  const result = {
+    annotation_id: crypto.randomUUID(),
+
+    meaning_id: ex.meaning_id,
+    idiom_id: ex.idiom_id,
+
+    annotator: annotator,
+    session_id: sessionId,
+
+    idiom: ex.idiom,
+    language: ex.language,
+    sentence: ex.sentence,
+
+    original_idiomaticity: originalIdio,
+    idiomaticity_verdict: selectedIdio,
+
+    label_changed: selectedIdio !== originalIdio,
+
+    span_start: ex.span_start,
+    span_end: ex.span_end,
+
+    matched_span:
+      ex.matched_span ||
+      ex.sentence.slice(ex.span_start, ex.span_end),
+
+    span_correct: spanCorrect,
+
+    span_correction:
+      spanCorrect ? null : (correction || null),
+
+    notes: notes || null,
+
+    annotation_time_seconds: Number(annotationTimeSeconds),
+
+    validated_at: new Date().toISOString(),
+  };
+
+  results[ex.meaning_id] = result;
+
+  saveState();
+
+  try {
+    const resp = await fetch('http://localhost:8000/save', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(result)
+    });
+    if (!resp.ok) {
+      const detail = await resp.text();
+      console.error('Save failed (HTTP ' + resp.status + '):', detail);
+    }
+  } catch (err) {
+    console.error('Failed to save annotation:', err);
+  }
+
+  advanceToNext();
+}
+ 
+function skipExample() {
+  advanceToNext();
+}
+ 
+function advanceToNext() {
+  currentIdx++;
+  // Find next unvalidated in filtered set
+  while (currentIdx < filteredExamples.length && results[filteredExamples[currentIdx]?.meaning_id]) {
+    currentIdx++;
+  }
+  renderExample();
+}
+ 
+// ── Progress ──────────────────────────────────────────────────────────────────
+function updateProgress() {
+  const total    = filteredExamples.length;
+  const done     = filteredExamples.filter(e => results[e.meaning_id]).length;
+  const pct      = total ? (done / total * 100).toFixed(1) : 0;
+ 
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = `${done} / ${total}`;
+ 
+  const validated = Object.values(results);
+  document.getElementById('statDone').textContent    = validated.length;
+  document.getElementById('statCorrect').textContent =
+    validated.filter(r => !r.label_changed).length;
+  document.getElementById('statSpanOk').textContent  =
+    validated.filter(r => r.span_correct).length;
+  document.getElementById('statChanged').textContent =
+    validated.filter(r => r.label_changed || !r.span_correct).length;
+ 
+  renderFilterBar();
+}
+ 
+// ── Done screen ───────────────────────────────────────────────────────────────
+function showDone() {
+  document.getElementById('validatorScreen').classList.add('hidden');
+  const done = document.getElementById('doneScreen');
+  done.classList.add('visible');
+  const v = Object.values(results);
+  document.getElementById('doneSub').textContent =
+    `${v.length} examples validated. ${v.filter(r=>r.label_changed).length} label corrections, ` +
+    `${v.filter(r=>!r.span_correct).length} span corrections.`;
+}
+ 
+// ── Export ────────────────────────────────────────────────────────────────────
+function exportResults() {
+  const lines = Object.values(results).map(r => JSON.stringify(r)).join('\n');
+  download('validation_results.jsonl', lines);
+}
+ 
+function exportSummary() {
+  const v = Object.values(results);
+  const byLang = {};
+  v.forEach(r => {
+    if (!byLang[r.language]) byLang[r.language] = { total:0, label_correct:0, span_correct:0, label_changed:0, span_corrections:0 };
+    const b = byLang[r.language];
+    b.total++;
+    if (!r.label_changed) b.label_correct++;
+    if (r.span_correct)   b.span_correct++;
+    if (r.label_changed)  b.label_changed++;
+    if (!r.span_correct)  b.span_corrections++;
+  });
+ 
+  Object.values(byLang).forEach(b => {
+    b.label_accuracy = (b.label_correct / b.total * 100).toFixed(1) + '%';
+    b.span_accuracy  = (b.span_correct  / b.total * 100).toFixed(1) + '%';
+  });
+ 
+  const summary = {
+    total_validated: v.length,
+    label_accuracy:  (v.filter(r=>!r.label_changed).length / v.length * 100).toFixed(1) + '%',
+    span_accuracy:   (v.filter(r=>r.span_correct).length   / v.length * 100).toFixed(1) + '%',
+    by_language: byLang,
+    exported_at: new Date().toISOString(),
+  };
+  download('validation_summary.json', JSON.stringify(summary, null, 2));
+}
+ 
+function download(filename, content) {
+  const a = document.createElement('a');
+  a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(content);
+  a.download = filename;
+  a.click();
+}
+ 
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  if (annotator) {
+    document.getElementById('loginCard').classList.add('hidden');
+  }
+
+  if (loadState() && allExamples.length) {
+    showValidator();
+  }
+});
+</script>
+</body>
+</html>

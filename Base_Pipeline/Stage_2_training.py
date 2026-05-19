@@ -68,7 +68,9 @@ def parse_args():
     p.add_argument('--model_name',   default='bert-base-multilingual-cased')
     p.add_argument('--data_dir',     default='idioms_structured/Splits')
     p.add_argument('--output_dir',   default='models/stage2_mbert_en_hi_te')
-    p.add_argument('--langs',        nargs='+', default=['English', 'Hindi', 'Telugu'])
+    p.add_argument('--langs',        nargs='+', default=['English', 'Hindi', 'Telugu',"Spanish"])
+    p.add_argument('--test_langs',   nargs='+', default=None,
+                   help='Languages to evaluate on. Defaults to --langs. Use all target languages for cross-lingual ablations.')
     p.add_argument('--epochs',       type=int,   default=7)
     p.add_argument('--batch_size',   type=int,   default=32)
     p.add_argument('--lr',           type=float, default=1e-5)
@@ -381,7 +383,8 @@ def train(args):
     # Build datasets
     train_examples = build_dataset_for_split('train', args.data_dir, args.langs, args.seed)
     dev_examples   = build_dataset_for_split('dev',   args.data_dir, args.langs, args.seed)
-    test_examples  = build_dataset_for_split('test',  args.data_dir, args.langs, args.seed)
+    test_langs = args.test_langs or args.langs
+    test_examples  = build_dataset_for_split('test',  args.data_dir, test_langs, args.seed)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
@@ -543,6 +546,7 @@ def train(args):
         'test_overlap_f1':     test_overlap,
         'model':               args.model_name,
         'langs':               args.langs,
+        'test_langs':          test_langs,
         'train_size':          len(train_ds),
         'test_size':           len(test_ds),
     }

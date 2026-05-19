@@ -1,71 +1,94 @@
 {
   "English": {
-    "sampled": 2544,
+    "sampled_total": 2542,
     "unique_idioms": {
-      "train": 1745,
-      "dev": 218,
-      "test": 219
+      "train": 7710,
+      "dev": 964,
+      "test": 964
     },
     "train": {
       "total": 2034,
-      "idiomatic": 1024,
-      "literal": 1010
+      "idiomatic": 1017,
+      "literal": 1017
     },
     "dev": {
-      "total": 256,
+      "total": 254,
       "idiomatic": 127,
-      "literal": 129
+      "literal": 127
     },
     "test": {
       "total": 254,
-      "idiomatic": 121,
-      "literal": 133
+      "idiomatic": 127,
+      "literal": 127
+    }
+  },
+  "Spanish": {
+    "sampled_total": 2542,
+    "unique_idioms": {
+      "train": 2548,
+      "dev": 318,
+      "test": 319
+    },
+    "train": {
+      "total": 2034,
+      "idiomatic": 1017,
+      "literal": 1017
+    },
+    "dev": {
+      "total": 254,
+      "idiomatic": 127,
+      "literal": 127
+    },
+    "test": {
+      "total": 254,
+      "idiomatic": 127,
+      "literal": 127
     }
   },
   "Hindi": {
-    "sampled": 636,
+    "sampled_total": 632,
     "unique_idioms": {
-      "train": 145,
+      "train": 146,
       "dev": 18,
       "test": 19
     },
     "train": {
-      "total": 516,
-      "idiomatic": 263,
-      "literal": 253
+      "total": 508,
+      "idiomatic": 254,
+      "literal": 254
     },
     "dev": {
-      "total": 65,
+      "total": 62,
       "idiomatic": 31,
-      "literal": 34
+      "literal": 31
     },
     "test": {
-      "total": 55,
-      "idiomatic": 24,
+      "total": 62,
+      "idiomatic": 31,
       "literal": 31
     }
   },
   "Telugu": {
-    "sampled": 636,
+    "sampled_total": 629,
     "unique_idioms": {
       "train": 82,
       "dev": 10,
       "test": 11
     },
     "train": {
-      "total": 501,
-      "idiomatic": 255,
-      "literal": 246
+      "total": 506,
+      "idiomatic": 252,
+      "literal": 254
     },
     "dev": {
-      "total": 65,
+      "total": 61,
       "idiomatic": 30,
-      "literal": 35
+      "literal": 31
     },
     "test": {
-      "total": 70,
-      "idiomatic": 33,
-      "literal": 37
+      "total": 62,
+      "idiomatic": 31,
+      "literal": 31
     }
   }
 }

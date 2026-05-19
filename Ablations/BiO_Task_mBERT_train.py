@@ -69,16 +69,18 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument('--model_name',    default='bert-base-multilingual-cased')
     p.add_argument('--data_dir',      default='idioms_structured/Splits')
-    p.add_argument('--dropout', type=float, default=0.1)
+    p.add_argument('--dropout', type=float, default=.239431179668018881)
     p.add_argument('--output_dir',    default='models/bio_tagger_en_hi_te')
-    p.add_argument('--langs',         nargs='+', default=['English', 'Hindi', 'Telugu'])
-    p.add_argument('--epochs',        type=int,   default=7)
+    p.add_argument('--langs',         nargs='+', default=['English', 'Hindi', 'Telugu','Spanish'])
+    p.add_argument('--test_langs',    nargs='+', default=None,
+                   help='Languages to evaluate on. Defaults to --langs. Use all target languages for cross-lingual ablations.')
+    p.add_argument('--epochs',        type=int,   default=6)
     p.add_argument('--batch_size',    type=int,   default=32)
-    p.add_argument('--lr',            type=float, default=2e-5)
+    p.add_argument('--lr',            type=float, default=3.27e-05)
     p.add_argument('--max_len',       type=int,   default=128)
-    p.add_argument('--warmup_ratio',  type=float, default=0.1)
+    p.add_argument('--warmup_ratio',  type=float, default=0.096)
     p.add_argument('--seed',          type=int,   default=42)
-    p.add_argument('--o_weight',      type=float, default=0.1,
+    p.add_argument('--o_weight',      type=float, default=0.104,
                    help='Loss weight for O class (B/I are weighted 1.0). '
                         'Lower values focus training on span tokens.')
     p.add_argument('--use_wandb',     action='store_true')
@@ -499,7 +501,8 @@ def train(args):
     print("\nLoading splits...")
     train_examples = load_split(args.data_dir, 'train', args.langs)
     dev_examples   = load_split(args.data_dir, 'dev',   args.langs)
-    test_examples  = load_split(args.data_dir, 'test',  args.langs)
+    test_langs = args.test_langs or args.langs
+    test_examples  = load_split(args.data_dir, 'test',  test_langs)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
@@ -665,6 +668,7 @@ def train(args):
     metrics = {
         'model':             args.model_name,
         'langs':             args.langs,
+        'test_langs':        test_langs,
         'best_epoch':        best_epoch,
         'best_dev_overlap':  best_dev_overlap,
         'test_exact_match':  round(float(test_exact),   4),

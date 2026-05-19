@@ -78,8 +78,10 @@ def parse_args():
     p.add_argument('--model_name',   default='bert-base-multilingual-cased')
     p.add_argument('--data_dir',     default='idioms_structured/Splits')
     p.add_argument('--output_dir',   default='models/stage1_mbert_en_hi_te')
-    p.add_argument('--langs',        nargs='+', default=['English', 'Hindi', 'Telugu'],
+    p.add_argument('--langs',        nargs='+', default=['English', 'Hindi', 'Telugu','Spanish'],
                    help='Languages to include e.g. --langs English Hindi Telugu')
+    p.add_argument('--test_langs',   nargs='+', default=None,
+                   help='Languages to evaluate on. Defaults to --langs. Use all target languages for cross-lingual ablations.')
     p.add_argument('--epochs',       type=int,   default=7)
     p.add_argument('--batch_size',   type=int,   default=32)
     p.add_argument('--lr',           type=float, default=3e-5)
@@ -271,7 +273,8 @@ def train(args):
     # Build datasets
     train_examples = build_dataset_for_split('train', args.data_dir, args.langs)
     dev_examples   = build_dataset_for_split('dev',   args.data_dir, args.langs)
-    test_examples  = build_dataset_for_split('test',  args.data_dir, args.langs)
+    test_langs = args.test_langs or args.langs
+    test_examples  = build_dataset_for_split('test',  args.data_dir, test_langs)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     train_ds  = IdiomDataset(train_examples, tokenizer, args.max_len)
@@ -383,6 +386,7 @@ def train(args):
         'test_macro_f1': test_f1,
         'model':         args.model_name,
         'langs':         args.langs,
+        'test_langs':    test_langs,
         'train_size':    len(train_examples),
         'dev_size':      len(dev_examples),
         'test_size':     len(test_examples),

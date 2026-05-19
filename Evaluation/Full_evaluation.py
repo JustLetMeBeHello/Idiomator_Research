@@ -689,7 +689,7 @@ def evaluate_system_g(bio_preds):
 # ── Summary table ─────────────────────────────────────────────────────────────
 
 def print_summary(results_a, results_b, results_c, results_d, results_e, results_f, results_g):
-    LANGS = ['English', 'Hindi', 'Telugu']
+    LANGS = ['English', 'Spanish', 'Hindi', 'Telugu'] # Added Spanish
 
     systems = [
         ("A: mBERT Pipeline (S1→S2)",        results_a),
@@ -770,9 +770,11 @@ def print_summary(results_a, results_b, results_c, results_d, results_e, results
         print(row)
 
     # ── Per-language Joint F1 ─────────────────────────────────────────────────
-    print(f"\n{'─'*108}")
-    print("Joint F1 — Per Language")
-    print(f"{'─'*108}")
+# ── Per-language Classification F1 ────────────────────────────────────────
+# ── Per-language Joint F1 ─────────────────────────────────────────────────
+    print(f"\n{'─'*122}") 
+    print("Joint F1 — Per Language  (pooled/macro-avg across all examples)")
+    print(f"{'─'*122}") 
     print(lhdr)
     print("-" * len(lhdr))
     for label, res in systems:

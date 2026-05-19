@@ -39,7 +39,7 @@ load_dotenv()
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument('--test_path',   default='Research_And_Training/idioms_structured/Splits/test.jsonl')
+    p.add_argument('--test_path',   default='idioms_structured/Splits/test.jsonl')
     p.add_argument('--output_dir',  default='models/gpt_baseline_stage1')
     p.add_argument('--model',       default='gpt-4o')
     p.add_argument('--dry_run',     type=int, default=None,

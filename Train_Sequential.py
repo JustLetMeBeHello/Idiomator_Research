@@ -70,7 +70,9 @@ def parse_args():
     p.add_argument('--data_dir',           default='idioms_structured/Splits')
     p.add_argument('--dropout', type=float, default=0.1)
     p.add_argument('--output_dir',         default='models/sequential')
-    p.add_argument('--langs',              nargs='+', default=['English', 'Hindi', 'Telugu'])
+    p.add_argument('--langs',              nargs='+', default=['English', 'Hindi', 'Telugu', 'Spanish'])
+    p.add_argument('--test_langs',         nargs='+', default=None,
+                   help='Languages to evaluate on. Defaults to --langs. Use all target languages for cross-lingual ablations.')
     p.add_argument('--phase',              type=int, default=0,
                    help='1=phase1 only, 2=phase2 only, 0=both (default)')
     # Phase 1 hyperparams
@@ -707,7 +709,8 @@ def main():
 
     train_examples = load_split(args.data_dir, 'train', args.langs)
     dev_examples   = load_split(args.data_dir, 'dev',   args.langs)
-    test_examples  = load_split(args.data_dir, 'test',  args.langs)
+    test_langs = args.test_langs or args.langs
+    test_examples  = load_split(args.data_dir, 'test',  test_langs)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
@@ -716,6 +719,8 @@ def main():
     dev_ds   = JointDataset(dev_examples,   tokenizer, args.max_len)
     test_ds  = JointDataset(test_examples,  tokenizer, args.max_len)
     print(f"Train: {len(train_ds)} | Dev: {len(dev_ds)} | Test: {len(test_ds)}")
+    print(f"Train/dev languages: {args.langs}")
+    print(f"Test languages: {test_langs}")
 
     phase1_dir = Path(args.output_dir) / 'phase1'
 

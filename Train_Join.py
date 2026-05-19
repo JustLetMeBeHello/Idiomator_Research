@@ -67,13 +67,6 @@ ID2LABEL  = {0: 'literal', 1: 'idiomatic'}
 
 LOW_RESOURCE_LANGS = {'Hindi', 'Telugu'}
 
-RAW_FILES = {
-    'English': 'idioms_structured/Span_tagged_data/English/Final_English_MERGED_normalized.jsonl',
-    'Hindi':   'idioms_structured/Span_tagged_data/Hindi/Final_Hindi_MERGED.jsonl',
-    'Telugu':  'idioms_structured/Span_tagged_data/Telugu/Final_Telugu_MERGED.jsonl',
-}
-
-
 # ── Args ──────────────────────────────────────────────────────────────────────
 
 def parse_args():
@@ -81,8 +74,13 @@ def parse_args():
     p.add_argument('--model_name',      default='bert-base-multilingual-cased')
     p.add_argument('--data_dir',        default='idioms_structured/Splits')
     p.add_argument('--dropout', type=float, default=0.1)
-    p.add_argument('--output_dir',      default='models/joint_mbert_en_hi_te')
-    p.add_argument('--langs',           nargs='+', default=['English', 'Hindi', 'Telugu'])
+    p.add_argument('--output_dir',      default='models/Spanish_Addition/joint_mbert_en_hi_te')
+    p.add_argument('--langs', nargs='+', default=['English', 'Spanish', 'Hindi', 'Telugu'], # Added Spanish
+    help='Languages to include in training/eval'
+)
+    p.add_argument('--test_langs', nargs='+', default=None,
+    help='Languages to evaluate on. Defaults to --langs. Use all target languages for cross-lingual ablations.'
+)
     p.add_argument('--epochs',          type=int,   default=7)
     p.add_argument('--batch_size',      type=int,   default=32)
     p.add_argument('--lr',              type=float, default=2e-05)
@@ -118,30 +116,6 @@ def get_device(forced=None):
 
 
 # ── Data loading ──────────────────────────────────────────────────────────────
-
-def load_raw_examples(lang):
-    """Load ALL examples from raw JSONL (used for Hi/Te)."""
-    examples = []
-    for line in open(RAW_FILES[lang], encoding='utf-8'):
-        r = json.loads(line)
-        for ex in r['examples']:
-            if ex.get('span_flagged'):
-                continue
-            examples.append({
-                'language':     lang,
-                'idiom_id':     r['idiom_id'],
-                'idiom':        r['idiom'],
-                'meaning_id':   r.get('meaning_id'),
-                'sense_number': r.get('sense_number'),
-                'idiomaticity': r['Idiomaticity'],
-                'register':     r.get('Register'),
-                'region':       r.get('Region'),
-                'sentence':     ex['sentence'],
-                'span_start':   ex['span_start'],
-                'span_end':     ex['span_end'],
-                'matched_span': ex['matched_span'],
-            })
-    return examples
 
 
 def load_split_examples(split_path, langs):
@@ -499,7 +473,8 @@ def train(args):
     # Build datasets
     train_examples = build_dataset_for_split('train', args.data_dir, args.langs, args.seed)
     dev_examples   = build_dataset_for_split('dev',   args.data_dir, args.langs, args.seed)
-    test_examples  = build_dataset_for_split('test',  args.data_dir, args.langs, args.seed)
+    test_langs = args.test_langs or args.langs
+    test_examples  = build_dataset_for_split('test',  args.data_dir, test_langs, args.seed)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
@@ -680,6 +655,7 @@ def train(args):
         'test_span_overlap': test_overlap,
         'model':             args.model_name,
         'langs':             args.langs,
+        'test_langs':        test_langs,
         'cls_loss_weight':   args.cls_loss_weight,
         'span_loss_weight':  args.span_loss_weight,
         'train_size':        len(train_ds),
