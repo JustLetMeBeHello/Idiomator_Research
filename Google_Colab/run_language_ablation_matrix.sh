@@ -35,6 +35,12 @@ ABLATION_DIR="${ABLATION_DIR:-models/language_ablation_matrix}"
 EVAL_DIR="${EVAL_DIR:-results/language_ablation_matrix}"
 LOG_DIR="${LOG_DIR:-results/language_ablation_matrix/logs}"
 
+# Google Drive space saver:
+#   0 = keep only paper artifacts (metrics, predictions, summaries, logs)
+#       and delete bulky best_model checkpoints after each completed run.
+#   1 = keep all model checkpoints.
+KEEP_CHECKPOINTS="${KEEP_CHECKPOINTS:-0}"
+
 # Locked hyperparameters from the paper/full-condition runs.
 STAGE1_LR="${STAGE1_LR:-3e-5}"
 STAGE1_EPOCHS="${STAGE1_EPOCHS:-7}"
@@ -67,6 +73,25 @@ BIO_O_WEIGHT="${BIO_O_WEIGHT:-0.104}"
 mkdir -p "$ABLATION_DIR" "$EVAL_DIR" "$LOG_DIR"
 
 cd "$ROOT"
+
+cleanup_checkpoints() {
+  if [[ "$KEEP_CHECKPOINTS" == "1" ]]; then
+    return
+  fi
+
+  local run_id="$1"
+  local base="$ABLATION_DIR/$run_id"
+
+  # These folders contain the large HuggingFace checkpoints. The metrics and
+  # test_predictions.jsonl files remain in place, so completed runs still skip
+  # correctly and all paper tables can be regenerated.
+  rm -rf "$base/stage1_mbert/best_model"
+  rm -rf "$base/stage2_mbert/best_model"
+  rm -rf "$base/joint_mbert/best_model"
+  rm -rf "$base/sequential_mbert/phase1/best_model"
+  rm -rf "$base/sequential_mbert/phase2/best_model"
+  rm -rf "$base/bio_tagger/best_model"
+}
 
 run_cmd() {
   local name="$1"
@@ -228,6 +253,7 @@ run_combo() {
   train_sequential "$run_id" "$@"
   train_bio "$run_id" "$@"
   evaluate_combo "$run_id"
+  cleanup_checkpoints "$run_id"
 }
 
 run_combo "en" English
