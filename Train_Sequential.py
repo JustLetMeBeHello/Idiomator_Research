@@ -151,6 +151,8 @@ def compute_cls_loss_weights(examples, device):
 # ── Span helpers ──────────────────────────────────────────────────────────────
 
 def char_to_token_span(encoding, char_start, char_end, sentence):
+    if char_start is None or char_end is None:
+        return None, None
     token_start = None
     for i in range(len(sentence)):
         t = encoding.char_to_token(i)

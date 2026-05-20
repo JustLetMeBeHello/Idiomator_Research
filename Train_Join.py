@@ -172,6 +172,8 @@ def compute_cls_loss_weights(train_examples, device):
 # ── Span alignment helpers (from Stage 2, unchanged) ─────────────────────────
 
 def char_to_token_span(encoding, char_start, char_end, sentence):
+    if char_start is None or char_end is None:
+        return None, None
     token_start = None
     for i in range(len(sentence)):
         t = encoding.char_to_token(i)
