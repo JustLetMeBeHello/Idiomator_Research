@@ -1,5 +1,5 @@
 """
-train_stage2_span.py
+Stage_2_training.py
 
 Stage 2: Fine-tune mBERT (or monolingual BERT) for MWE span extraction.
 Input  : raw sentence (no idiom hint)
@@ -12,21 +12,34 @@ of whether it's used idiomatically or literally.
 
 Evaluation:
   - Exact span match (predicted span == gold span exactly)
-  - Partial overlap F1 (token-level overlap between predicted and gold)
+  - Partial overlap F1 (character-level overlap between predicted and gold)
+
+Fixes vs previous version:
+  - TypeError crash: char_start/char_end could be None for examples where
+    span_start/span_end is missing or null in the data. Both char_to_token_span
+    and SpanDataset.__init__ now guard against this explicitly before any
+    comparison, so null-span examples are skipped cleanly with a diagnostic
+    count broken down by language.
+  - char_to_token_span now takes int(char_start/char_end) defensively even
+    after the None check, in case values arrive as float or string.
+  - SpanDataset reports null-span skips separately from alignment-failure
+    skips so you can distinguish a data issue from a tokenizer issue.
+  - evaluate() uses dataset.valid_examples directly rather than the raw
+    examples list, so batch indexing is always correct even after skips.
 
 Usage:
     # mBERT multilingual
-    python train_stage2_span.py \
+    python Stage_2_training.py \
         --output_dir models/stage2_mbert_en_hi_te \
         --langs English Hindi Telugu
 
     # Hindi + Telugu only
-    python train_stage2_span.py \
+    python Stage_2_training.py \
         --output_dir models/stage2_mbert_hi_te \
         --langs Hindi Telugu
 
     # Monolingual BERT English
-    python train_stage2_span.py \
+    python Stage_2_training.py \
         --model_name bert-base-uncased \
         --output_dir models/stage2_bert_en \
         --langs English
@@ -68,9 +81,10 @@ def parse_args():
     p.add_argument('--model_name',   default='bert-base-multilingual-cased')
     p.add_argument('--data_dir',     default='idioms_structured/Splits')
     p.add_argument('--output_dir',   default='models/stage2_mbert_en_hi_te')
-    p.add_argument('--langs',        nargs='+', default=['English', 'Hindi', 'Telugu',"Spanish"])
+    p.add_argument('--langs',        nargs='+', default=['English', 'Hindi', 'Telugu', 'Spanish'])
     p.add_argument('--test_langs',   nargs='+', default=None,
-                   help='Languages to evaluate on. Defaults to --langs. Use all target languages for cross-lingual ablations.')
+                   help='Languages to evaluate on. Defaults to --langs. '
+                        'Pass all target languages for cross-lingual ablations.')
     p.add_argument('--epochs',       type=int,   default=7)
     p.add_argument('--batch_size',   type=int,   default=32)
     p.add_argument('--lr',           type=float, default=1e-5)
@@ -104,28 +118,24 @@ def get_device(forced=None):
 # ── Data loading ──────────────────────────────────────────────────────────────
 
 def load_split_examples(split_path, langs):
-    """Load examples for specific languages from a split file."""
+    """Load examples for specific languages from a split JSONL file."""
     if not split_path.exists():
         print(f"  ⚠ Split file not found: {split_path}")
         return []
-    
     langs_set = set(langs)
-    return [
-        json.loads(l) for l in open(split_path, encoding='utf-8')
-        if json.loads(l)['language'] in langs_set
-    ]
+    examples = []
+    for line in open(split_path, encoding='utf-8'):
+        ex = json.loads(line)
+        if ex['language'] in langs_set:
+            examples.append(ex)
+    return examples
+
 
 def build_dataset_for_split(split_name, data_dir, langs, seed=42):
-    """
-    Load the dataset using only the JSONL splits in the directory.
-    """
+    """Load examples for a given split from the JSONL split files."""
     split_path = Path(data_dir) / f'{split_name}.jsonl'
     print(f"Loading {split_name} from {split_path}...")
-    
-    # Load all requested languages directly from the split file
-    all_examples = load_split_examples(split_path, langs)
-    
-    return all_examples
+    return load_split_examples(split_path, langs)
 
 
 # ── Tokenization & span alignment ─────────────────────────────────────────────
@@ -133,20 +143,38 @@ def build_dataset_for_split(split_name, data_dir, langs, seed=42):
 def char_to_token_span(encoding, char_start, char_end, sentence):
     """
     Convert character offsets to token indices using HuggingFace's
-    char_to_token() method. Returns (token_start, token_end) or None if
-    alignment fails.
+    char_to_token() method. Returns (token_start, token_end) or (None, None)
+    if alignment fails.
+
+    FIX: char_start and char_end are now validated as non-None integers before
+    any comparison. The previous version crashed with:
+        TypeError: '>=' not supported between instances of 'int' and 'NoneType'
+    when span_start/span_end were null in the source data.
     """
-    # Find first token that starts at or after char_start
+    # ── Guard: reject None or non-integer span values ─────────────────────────
+    if char_start is None or char_end is None:
+        return None, None
+    try:
+        char_start = int(char_start)
+        char_end   = int(char_end)
+    except (TypeError, ValueError):
+        return None, None
+
+    if char_start < 0 or char_end <= char_start or char_end > len(sentence):
+        return None, None
+    # ──────────────────────────────────────────────────────────────────────────
+
+    # Find first token that covers or follows char_start
     token_start = None
-    for i in range(len(sentence)):
+    for i in range(char_start, len(sentence)):
         t = encoding.char_to_token(i)
-        if t is not None and i >= char_start:
+        if t is not None:
             token_start = t
             break
 
-    # Find last token that ends at or before char_end
+    # Find last token that covers or precedes char_end
     token_end = None
-    for i in range(char_end - 1, -1, -1):
+    for i in range(char_end - 1, char_start - 1, -1):
         t = encoding.char_to_token(i)
         if t is not None:
             token_end = t
@@ -163,18 +191,39 @@ def char_to_token_span(encoding, char_start, char_end, sentence):
 
 class SpanDataset(Dataset):
     def __init__(self, examples, tokenizer, max_len):
-        self.valid_examples = []
-        self.input_ids      = []
+        self.valid_examples  = []
+        self.input_ids       = []
         self.attention_masks = []
         self.token_type_ids  = []
         self.start_positions = []
         self.end_positions   = []
 
-        skipped = 0
+        # Track skips separately: null spans (data issue) vs alignment failures
+        # (tokenizer issue) so the two are distinguishable in logs.
+        null_span_skips      = 0
+        null_span_by_lang    = defaultdict(int)
+        alignment_skips      = 0
+        alignment_by_lang    = defaultdict(int)
+
         for ex in examples:
-            sentence  = ex['sentence']
-            char_start = ex['span_start']
-            char_end   = ex['span_end']
+            sentence   = ex.get('sentence', '')
+            char_start = ex.get('span_start')
+            char_end   = ex.get('span_end')
+            lang       = ex.get('language', 'Unknown')
+
+            # ── FIX: skip null-span examples before touching char offsets ─────
+            if char_start is None or char_end is None:
+                null_span_skips += 1
+                null_span_by_lang[lang] += 1
+                continue
+            try:
+                char_start = int(char_start)
+                char_end   = int(char_end)
+            except (TypeError, ValueError):
+                null_span_skips += 1
+                null_span_by_lang[lang] += 1
+                continue
+            # ──────────────────────────────────────────────────────────────────
 
             encoding = tokenizer(
                 sentence,
@@ -185,7 +234,7 @@ class SpanDataset(Dataset):
                 return_tensors='pt',
             )
 
-            # Also encode without padding to get char_to_token mapping
+            # Encode without padding to get char_to_token mapping
             enc_map = tokenizer(
                 sentence,
                 max_length=max_len,
@@ -198,11 +247,12 @@ class SpanDataset(Dataset):
             )
 
             if token_start is None or token_end is None:
-                skipped += 1
+                alignment_skips += 1
+                alignment_by_lang[lang] += 1
                 continue
 
             # Clamp to max_len - 1
-            seq_len    = encoding['input_ids'].shape[1]
+            seq_len     = encoding['input_ids'].shape[1]
             token_start = min(token_start, seq_len - 1)
             token_end   = min(token_end,   seq_len - 1)
 
@@ -217,8 +267,24 @@ class SpanDataset(Dataset):
             self.start_positions.append(token_start)
             self.end_positions.append(token_end)
 
-        if skipped:
-            print(f"  Skipped {skipped} examples with failed span alignment")
+        # ── Diagnostic reporting ──────────────────────────────────────────────
+        if null_span_skips:
+            print(f"  ⚠ Skipped {null_span_skips} examples with null/missing span_start or span_end")
+            print(f"    This is a DATA issue — check upstream pipeline for these languages:")
+            for lang, count in sorted(null_span_by_lang.items()):
+                print(f"      {lang}: {count} examples")
+
+        if alignment_skips:
+            print(f"  ⚠ Skipped {alignment_skips} examples where char→token alignment failed")
+            print(f"    This is a TOKENIZER issue (e.g. subword boundary mismatch):")
+            for lang, count in sorted(alignment_by_lang.items()):
+                print(f"      {lang}: {count} examples")
+
+        total_skipped = null_span_skips + alignment_skips
+        if total_skipped:
+            print(f"  Total skipped: {total_skipped} / {len(examples)} "
+                  f"({100 * total_skipped / max(len(examples), 1):.1f}%)")
+        # ──────────────────────────────────────────────────────────────────────
 
     def __len__(self):
         return len(self.valid_examples)
@@ -268,8 +334,8 @@ class SpanExtractor(torch.nn.Module):
 
 def token_to_char_span(tokenizer, sentence, token_start, token_end, max_len):
     """Convert predicted token indices back to character offsets."""
-    enc = tokenizer(sentence, max_length=max_len, truncation=True,
-                    return_offsets_mapping=True)
+    enc     = tokenizer(sentence, max_length=max_len, truncation=True,
+                        return_offsets_mapping=True)
     offsets = enc['offset_mapping']
 
     if token_start >= len(offsets) or token_end >= len(offsets):
@@ -281,7 +347,7 @@ def token_to_char_span(tokenizer, sentence, token_start, token_end, max_len):
 
 
 def compute_overlap_f1(pred_start, pred_end, gold_start, gold_end):
-    """Token-level overlap F1 between predicted and gold spans."""
+    """Character-level overlap F1 between predicted and gold spans."""
     pred_set = set(range(pred_start, pred_end + 1))
     gold_set = set(range(gold_start, gold_end + 1))
 
@@ -297,14 +363,21 @@ def compute_overlap_f1(pred_start, pred_end, gold_start, gold_end):
     return 2 * precision * recall / (precision + recall)
 
 
-def evaluate(model, loader, tokenizer, examples, device, split_name, max_len):
+def evaluate(model, loader, tokenizer, dataset, device, split_name, max_len):
+    """
+    Evaluate span extraction on a DataLoader.
+    Uses dataset.valid_examples (post-skip list) for correct index alignment.
+    """
     model.eval()
 
-    exact_matches  = 0
-    overlap_f1s    = []
-    lang_exact     = defaultdict(list)
-    lang_f1        = defaultdict(list)
-    total          = 0
+    exact_matches = 0
+    overlap_f1s   = []
+    lang_exact    = defaultdict(list)
+    lang_f1       = defaultdict(list)
+    total         = 0
+
+    # Build a flat index over valid_examples aligned to loader order
+    examples = dataset.valid_examples
 
     with torch.no_grad():
         for batch_idx, batch in enumerate(tqdm(loader, desc=f'Eval {split_name}', leave=False)):
@@ -325,9 +398,8 @@ def evaluate(model, loader, tokenizer, examples, device, split_name, max_len):
                 if ex_idx >= len(examples):
                     break
 
-                ex         = examples[ex_idx]
-                sentence   = ex['sentence']
-                lang       = ex['language']
+                ex   = examples[ex_idx]
+                lang = ex['language']
 
                 pred_s = int(pred_starts[i])
                 pred_e = int(pred_ends[i])
@@ -338,20 +410,18 @@ def evaluate(model, loader, tokenizer, examples, device, split_name, max_len):
                 if pred_e < pred_s:
                     pred_e = pred_s
 
-                # Exact match
                 exact = int(pred_s == gold_s and pred_e == gold_e)
                 exact_matches += exact
                 lang_exact[lang].append(exact)
 
-                # Overlap F1
                 f1 = compute_overlap_f1(pred_s, pred_e, gold_s, gold_e)
                 overlap_f1s.append(f1)
                 lang_f1[lang].append(f1)
 
                 total += 1
 
-    exact_match  = exact_matches / total if total > 0 else 0
-    avg_overlap  = np.mean(overlap_f1s) if overlap_f1s else 0
+    exact_match = exact_matches / total if total > 0 else 0.0
+    avg_overlap = float(np.mean(overlap_f1s)) if overlap_f1s else 0.0
 
     print(f"\n── {split_name} results ──")
     print(f"  Exact match:    {exact_match:.4f}")
@@ -359,9 +429,10 @@ def evaluate(model, loader, tokenizer, examples, device, split_name, max_len):
     print(f"  Total examples: {total}")
 
     for lang in sorted(lang_exact.keys()):
-        le = np.mean(lang_exact[lang])
-        lf = np.mean(lang_f1[lang])
-        print(f"  {lang}: exact={le:.4f}  overlap_f1={lf:.4f}  ({len(lang_exact[lang])} examples)")
+        le = float(np.mean(lang_exact[lang]))
+        lf = float(np.mean(lang_f1[lang]))
+        print(f"  {lang:<12}: exact={le:.4f}  overlap_f1={lf:.4f}  "
+              f"({len(lang_exact[lang])} examples)")
 
     return exact_match, avg_overlap
 
@@ -378,13 +449,17 @@ def train(args):
 
     config = vars(args)
     json.dump(config, open(output_dir / 'config.json', 'w'), indent=2)
-    print(f"Languages: {args.langs}")
+    print(f"Languages (train): {args.langs}")
 
-    # Build datasets
+    # Build raw example lists
     train_examples = build_dataset_for_split('train', args.data_dir, args.langs, args.seed)
     dev_examples   = build_dataset_for_split('dev',   args.data_dir, args.langs, args.seed)
-    test_langs = args.test_langs or args.langs
+    test_langs     = args.test_langs or args.langs
     test_examples  = build_dataset_for_split('test',  args.data_dir, test_langs, args.seed)
+
+    print(f"Languages (test):  {test_langs}")
+    print(f"Raw counts — train: {len(train_examples)} | "
+          f"dev: {len(dev_examples)} | test: {len(test_examples)}")
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
@@ -395,11 +470,18 @@ def train(args):
     print("Tokenizing test...")
     test_ds  = SpanDataset(test_examples,  tokenizer, args.max_len)
 
+    print(f"After tokenization — train: {len(train_ds)} | "
+          f"dev: {len(dev_ds)} | test: {len(test_ds)}")
+
+    if len(train_ds) == 0:
+        raise RuntimeError(
+            "Training set is empty after tokenization. "
+            "Check --langs and --data_dir, and inspect the null-span warnings above."
+        )
+
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True)
     dev_loader   = DataLoader(dev_ds,   batch_size=args.batch_size)
     test_loader  = DataLoader(test_ds,  batch_size=args.batch_size)
-
-    print(f"Train: {len(train_ds)} | Dev: {len(dev_ds)} | Test: {len(test_ds)}")
 
     model     = SpanExtractor(args.model_name).to(device)
     optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
@@ -448,7 +530,7 @@ def train(args):
         print(f"\nEpoch {epoch} avg loss: {avg_loss:.4f}")
 
         exact, overlap = evaluate(
-            model, dev_loader, tokenizer, dev_ds.valid_examples,
+            model, dev_loader, tokenizer, dev_ds,
             device, f'Dev (epoch {epoch})', args.max_len
         )
 
@@ -462,33 +544,33 @@ def train(args):
             best_epoch   = epoch
             model.bert.save_pretrained(output_dir / 'best_model')
             tokenizer.save_pretrained(output_dir / 'best_model')
-            # Save span heads separately
-            torch.save({
-                'start_head': model.start_head.state_dict(),
-                'end_head':   model.end_head.state_dict(),
-            }, output_dir / 'best_model' / 'span_heads.pt')
+            torch.save(
+                {'start_head': model.start_head.state_dict(),
+                 'end_head':   model.end_head.state_dict()},
+                output_dir / 'best_model' / 'span_heads.pt'
+            )
             print(f"  ✓ New best model saved (dev overlap F1: {best_overlap:.4f})")
 
     print(f"\nBest dev overlap F1: {best_overlap:.4f} at epoch {best_epoch}")
 
-    # Final test eval
+    # ── Final test evaluation ─────────────────────────────────────────────────
     print("\nLoading best model for test evaluation...")
     best_model = SpanExtractor(args.model_name)
     best_model.bert = AutoModel.from_pretrained(output_dir / 'best_model')
-    heads = torch.load(output_dir / 'best_model' / 'span_heads.pt',
-                       map_location='cpu')
+    heads = torch.load(output_dir / 'best_model' / 'span_heads.pt', map_location='cpu')
     best_model.start_head.load_state_dict(heads['start_head'])
     best_model.end_head.load_state_dict(heads['end_head'])
     best_model = best_model.to(device)
 
     test_exact, test_overlap = evaluate(
-        best_model, test_loader, tokenizer, test_ds.valid_examples,
+        best_model, test_loader, tokenizer, test_ds,
         device, 'Test (final)', args.max_len
     )
 
-    # Save predictions
+    # ── Save predictions ──────────────────────────────────────────────────────
     best_model.eval()
     preds_out = []
+
     with torch.no_grad():
         for batch_idx, batch in enumerate(test_loader):
             input_ids      = batch['input_ids'].to(device)
@@ -516,7 +598,6 @@ def train(args):
                 gold_s = int(gold_starts[i])
                 gold_e = int(gold_ends[i])
 
-                # Convert token indices back to char offsets
                 pred_char_s, pred_char_e = token_to_char_span(
                     tokenizer, ex['sentence'], pred_s, pred_e, args.max_len
                 )
@@ -526,18 +607,18 @@ def train(args):
 
                 preds_out.append({
                     **ex,
-                    'pred_span_start':  pred_char_s,
-                    'pred_span_end':    pred_char_e,
+                    'pred_span_start':   pred_char_s,
+                    'pred_span_end':     pred_char_e,
                     'pred_matched_span': pred_span,
-                    'exact_match':      bool(pred_s == gold_s and pred_e == gold_e),
-                    'overlap_f1':       round(compute_overlap_f1(pred_s, pred_e, gold_s, gold_e), 4),
+                    'exact_match':       bool(pred_s == gold_s and pred_e == gold_e),
+                    'overlap_f1':        round(compute_overlap_f1(pred_s, pred_e, gold_s, gold_e), 4),
                 })
 
     preds_path = output_dir / 'test_predictions.jsonl'
     with open(preds_path, 'w', encoding='utf-8') as f:
-        for p in preds_out:
-            f.write(json.dumps(p, ensure_ascii=False) + '\n')
-    print(f"Predictions saved → {preds_path}")
+        for pred in preds_out:
+            f.write(json.dumps(pred, ensure_ascii=False) + '\n')
+    print(f"Predictions saved → {preds_path}  ({len(preds_out)} examples)")
 
     metrics = {
         'best_dev_overlap_f1': best_overlap,
@@ -548,6 +629,7 @@ def train(args):
         'langs':               args.langs,
         'test_langs':          test_langs,
         'train_size':          len(train_ds),
+        'dev_size':            len(dev_ds),
         'test_size':           len(test_ds),
     }
     json.dump(metrics, open(output_dir / 'metrics.json', 'w'), indent=2)
