@@ -16,6 +16,18 @@ Summary tables report per-language breakdowns for:
   - Classification Macro F1
   - E2E Span Overlap F1
   - Joint F1
+  - Stability metrics (mean, std, worst-language, stability score)
+  - Indonesian bootstrap confidence intervals (n=10,000 resamples)
+
+Fixes vs previous version:
+  - BIO joint_acc was reading a non-existent 'span_exact_match' field (always 0.0).
+    Now computed correctly from pred_span_start/end vs gold span_start/end.
+  - Stability metrics added: per-system mean Joint F1, cross-language std,
+    worst-language Joint F1, best-minus-worst gap, stability score
+    (= mean - std, higher = more consistent across languages).
+  - Bootstrap 95% CIs added for all metrics on Indonesian test examples.
+  - Indonesian results are clearly separated from in-distribution evaluation
+    throughout all summary tables.
 
 Usage:
     python Full_evaluation.py
@@ -32,7 +44,8 @@ Usage:
         --seq_phase1    models/sequential/phase1/test_predictions.jsonl \\
         --seq_phase2    models/sequential/phase2/test_predictions.jsonl \\
         --bio_preds     models/bio_tagger_en_hi_te/test_predictions.jsonl \\
-        --output_dir    results/pipeline_eval
+        --output_dir    results/pipeline_eval \\
+        --n_bootstrap   10000
 """
 
 import json
@@ -40,14 +53,20 @@ import argparse
 import numpy as np
 from pathlib import Path
 from collections import defaultdict
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, precision_recall_fscore_support
 
+# ── Indonesian is the held-out generalization language ────────────────────────
+# It never appears in training. All Indonesian results are reported separately
+# with bootstrap CIs because the test set is only ~33 examples.
+HELD_OUT_LANG = "Indonesian"
+
+# Languages that are part of in-distribution evaluation
+IN_DIST_LANGS = ["English", "Spanish", "Hindi", "Telugu"]
 
 # ── Args ──────────────────────────────────────────────────────────────────────
 
 def parse_args():
     p = argparse.ArgumentParser()
-    # Existing systems
     p.add_argument('--stage1_mbert', default='models/stage1_mbert_en_hi_te/test_predictions.jsonl')
     p.add_argument('--stage2_mbert', default='models/stage2_mbert_en_hi_te/test_predictions.jsonl')
     p.add_argument('--stage1_gpt',   default='models/gpt_baseline_stage1/test_predictions.jsonl')
@@ -55,12 +74,12 @@ def parse_args():
     p.add_argument('--single_gpt',   default='models/gpt_single_stage/test_predictions.jsonl')
     p.add_argument('--joint_preds',  default='models/joint_mbert_en_hi_te/test_predictions.jsonl')
     p.add_argument('--span2_joint',  default='models/stage2_mbert_shared/test_predictions.jsonl')
-    # System F — sequential two-phase
     p.add_argument('--seq_phase1',   default='models/sequential/phase1/test_predictions.jsonl')
     p.add_argument('--seq_phase2',   default='models/sequential/phase2/test_predictions.jsonl')
-    # System G — BIO token-level tagger
     p.add_argument('--bio_preds',    default='models/bio_tagger_en_hi_te/test_predictions.jsonl')
     p.add_argument('--output_dir',   default='results/pipeline_eval')
+    p.add_argument('--n_bootstrap',  type=int, default=10000,
+                   help='Number of bootstrap resamples for Indonesian CIs')
     return p.parse_args()
 
 
@@ -168,7 +187,7 @@ def compute_joint_acc(s1_preds, s2_preds, pred_label_key='pred_idiomaticity'):
     """
     Joint accuracy over ALL examples (idiomatic + literal).
     - Idiomatic: correct cls AND exact char span match
-    - Literal:   correct cls is sufficient (no span to predict)
+    - Literal:   correct cls is sufficient
     Denominator is always total examples for comparability across systems.
     """
     correct = 0
@@ -180,7 +199,7 @@ def compute_joint_acc(s1_preds, s2_preds, pred_label_key='pred_idiomaticity'):
 
         if gold_label == 'literal':
             correct += int(cls_correct)
-        else:  # idiomatic — need cls AND span correct
+        else:
             if cls_correct and sentence in s2_preds:
                 s2 = s2_preds[sentence]
                 span_exact = (s2.get('pred_span_start') == s1['span_start'] and
@@ -199,18 +218,10 @@ def compute_joint_f1(s1_preds, s2_preds, pred_label_key='pred_idiomaticity',
       - Literal:   pred == gold == 'literal'
       - Idiomatic: pred == gold == 'idiomatic' AND
                    span overlap F1 > span_overlap_threshold
-                   (default 0.0 means any overlap counts; set 1.0 for exact match only)
-
-    We treat this as a binary classification problem:
-      - Class 1 (jointly_correct):   literal correct  OR  idiomatic correct + span correct
-      - Class 0 (jointly_incorrect): anything else
-
-    Returns macro F1, per-language macro F1, and (correct, total) counts.
+                   (default 0.0 means any overlap counts)
     """
-    from collections import defaultdict
-
-    lang_gold  = defaultdict(list)
-    lang_pred  = defaultdict(list)
+    lang_gold = defaultdict(list)
+    lang_pred = defaultdict(list)
 
     for sentence, s1 in s1_preds.items():
         gold_label = s1['idiomaticity']
@@ -218,12 +229,12 @@ def compute_joint_f1(s1_preds, s2_preds, pred_label_key='pred_idiomaticity',
         lang       = s1['language']
 
         if gold_label == 'literal':
-            gold_joint = 0                         # class 0 = literal
+            gold_joint = 0
             pred_joint = 0 if pred_label == 'literal' else 1
         else:
-            gold_joint = 1                         # class 1 = idiomatic
+            gold_joint = 1
             if pred_label != 'idiomatic':
-                pred_joint = 0  # wrong cls → treated as literal
+                pred_joint = 0
             else:
                 s2 = s2_preds.get(sentence, s1)
                 pred_s = s2.get('pred_span_start')
@@ -237,13 +248,12 @@ def compute_joint_f1(s1_preds, s2_preds, pred_label_key='pred_idiomaticity',
         lang_gold[lang].append(gold_joint)
         lang_pred[lang].append(pred_joint)
 
-    from sklearn.metrics import precision_recall_fscore_support
-
     per_lang = {}
     all_gold, all_pred = [], []
     for lang in sorted(lang_gold.keys()):
         g, p = lang_gold[lang], lang_pred[lang]
-        prec, rec, f1, _ = precision_recall_fscore_support(g, p, average=None, labels=[0, 1], zero_division=0)
+        prec, rec, f1, _ = precision_recall_fscore_support(
+            g, p, average=None, labels=[0, 1], zero_division=0)
         per_lang[lang] = {
             'macro_f1':  round(float(np.mean(f1)), 4),
             'literal':   {'P': round(prec[0],4), 'R': round(rec[0],4), 'F1': round(f1[0],4)},
@@ -252,11 +262,18 @@ def compute_joint_f1(s1_preds, s2_preds, pred_label_key='pred_idiomaticity',
         all_gold.extend(g)
         all_pred.extend(p)
 
-    prec, rec, f1, _ = precision_recall_fscore_support(all_gold, all_pred, average=None, labels=[0, 1], zero_division=0)
-    macro_avg_f1 = round(float(np.mean([per_lang[lang]['macro_f1'] for lang in sorted(lang_gold.keys())])), 4)
+    prec, rec, f1, _ = precision_recall_fscore_support(
+        all_gold, all_pred, average=None, labels=[0, 1], zero_division=0)
+
+    # macro_avg_f1: unweighted average of per-language macro F1s (preferred for reporting)
+    # macro_f1: pooled across all examples (majority-language weighted, reported for reference)
+    in_dist_langs = [l for l in sorted(lang_gold.keys()) if l != HELD_OUT_LANG]
+    macro_avg_f1 = round(float(np.mean(
+        [per_lang[lang]['macro_f1'] for lang in in_dist_langs])), 4)
+
     per_lang['Overall'] = {
-        'macro_f1':     round(float(np.mean(f1)), 4),   # pooled across all examples (majority-language weighted)
-        'macro_avg_f1': macro_avg_f1,                   # unweighted average of per-language macro F1s
+        'macro_f1':     round(float(np.mean(f1)), 4),
+        'macro_avg_f1': macro_avg_f1,
         'literal':   {'P': round(prec[0],4), 'R': round(rec[0],4), 'F1': round(f1[0],4)},
         'idiomatic': {'P': round(prec[1],4), 'R': round(rec[1],4), 'F1': round(f1[1],4)},
     }
@@ -264,10 +281,7 @@ def compute_joint_f1(s1_preds, s2_preds, pred_label_key='pred_idiomaticity',
 
 
 def build_pipeline_records(s1_preds, s2_preds, only_correct_cls=False):
-    """
-    Chain Stage 1 classification with Stage 2 span predictions.
-    only_correct_cls: if True, filters to gold=idiomatic AND pred=idiomatic only.
-    """
+    """Chain Stage 1 classification with Stage 2 span predictions."""
     pipeline_records = []
     for sentence, s1_pred in s1_preds.items():
         if sentence not in s2_preds:
@@ -293,9 +307,166 @@ def build_pipeline_records(s1_preds, s2_preds, only_correct_cls=False):
     return pipeline_records
 
 
+# ── Stability metrics ─────────────────────────────────────────────────────────
+
+def compute_stability(joint_f1_per_lang, langs=None):
+    """
+    Given a per-language joint F1 dict, compute:
+      - mean_joint:    unweighted mean across languages
+      - std_joint:     cross-language std (lower = more stable)
+      - worst_lang:    language with lowest Joint F1
+      - worst_f1:      that language's Joint F1
+      - gap:           best - worst Joint F1
+      - stability:     mean_joint - std_joint (higher = better + more consistent)
+
+    langs: list of languages to include; defaults to IN_DIST_LANGS present in dict.
+    """
+    if langs is None:
+        langs = [l for l in IN_DIST_LANGS if l in joint_f1_per_lang]
+
+    scores = {}
+    for lang in langs:
+        entry = joint_f1_per_lang.get(lang)
+        if entry is None:
+            continue
+        if isinstance(entry, dict):
+            scores[lang] = entry.get('macro_f1', 0.0)
+        else:
+            scores[lang] = float(entry)
+
+    if not scores:
+        return {}
+
+    vals       = list(scores.values())
+    mean_j     = float(np.mean(vals))
+    std_j      = float(np.std(vals))
+    worst_lang = min(scores, key=scores.__getitem__)
+    worst_f1   = scores[worst_lang]
+    best_f1    = max(scores.values())
+
+    return {
+        'mean_joint':  round(mean_j, 4),
+        'std_joint':   round(std_j, 4),
+        'worst_lang':  worst_lang,
+        'worst_f1':    round(worst_f1, 4),
+        'gap':         round(best_f1 - worst_f1, 4),
+        'stability':   round(mean_j - std_j, 4),
+        'langs':       scores,
+    }
+
+
+def print_stability_table(label, stability):
+    if not stability:
+        print(f"\n  {label}  [no data]")
+        return
+    print(f"\n  {label}")
+    print(f"  Mean Joint F1:  {stability['mean_joint']:.4f}")
+    print(f"  Std (langs):    {stability['std_joint']:.4f}   (lower = more stable)")
+    print(f"  Worst language: {stability['worst_lang']} = {stability['worst_f1']:.4f}")
+    print(f"  Best-Worst gap: {stability['gap']:.4f}")
+    print(f"  Stability score (mean - std): {stability['stability']:.4f}")
+    print(f"  Per-language: " +
+          "  ".join(f"{l}={v:.4f}" for l, v in stability['langs'].items()))
+
+
+# ── Bootstrap CI for Indonesian ───────────────────────────────────────────────
+
+def bootstrap_ci(values, statistic_fn=np.mean, n_resamples=10000, ci=0.95, seed=42):
+    """
+    Bootstrap confidence interval for a scalar statistic over a list of values.
+    Returns (point_estimate, lower, upper).
+    """
+    rng     = np.random.default_rng(seed)
+    vals    = np.array(values, dtype=float)
+    point   = statistic_fn(vals)
+    n       = len(vals)
+    samples = [statistic_fn(rng.choice(vals, size=n, replace=True))
+               for _ in range(n_resamples)]
+    alpha   = (1 - ci) / 2
+    lower   = float(np.quantile(samples, alpha))
+    upper   = float(np.quantile(samples, 1 - alpha))
+    return round(float(point), 4), round(lower, 4), round(upper, 4)
+
+
+def compute_indonesian_bootstrap(s1_preds, s2_preds,
+                                 pred_label_key='pred_idiomaticity',
+                                 n_resamples=10000):
+    """
+    Compute per-example joint correctness for Indonesian examples only,
+    then bootstrap CI over those values.
+
+    Returns dict with:
+      cls_f1, span_exact, span_overlap, joint_f1 — each with (point, lo, hi)
+    """
+    id_records_s1 = [r for r in s1_preds.values() if r['language'] == HELD_OUT_LANG]
+    if not id_records_s1:
+        return None
+
+    # Classification
+    cls_gold = [LABEL2ID.get(r['idiomaticity'], 1) for r in id_records_s1]
+    cls_pred = [LABEL2ID.get(r.get(pred_label_key, 'idiomatic'), 1)
+                for r in id_records_s1]
+    cls_correct = [int(g == p) for g, p in zip(cls_gold, cls_pred)]
+
+    # Span
+    span_exact_vals   = []
+    span_overlap_vals = []
+    joint_correct     = []
+
+    for r in id_records_s1:
+        gold_label = r['idiomaticity']
+        pred_label = r.get(pred_label_key, 'idiomatic')
+        gold_s = r['span_start']
+        gold_e = r['span_end']
+
+        s2 = s2_preds.get(r['sentence'], r)
+        pred_s = s2.get('pred_span_start')
+        pred_e = s2.get('pred_span_end')
+
+        exact   = int(pred_s == gold_s and pred_e == gold_e) if pred_s is not None else 0
+        overlap = compute_overlap_f1(pred_s, pred_e, gold_s, gold_e) \
+                  if pred_s is not None else 0.0
+
+        span_exact_vals.append(exact)
+        span_overlap_vals.append(overlap)
+
+        # Joint: literal needs correct cls; idiomatic needs correct cls + any overlap
+        if gold_label == 'literal':
+            joint_correct.append(int(pred_label == 'literal'))
+        else:
+            joint_correct.append(int(pred_label == 'idiomatic' and overlap > 0.0))
+
+    n = len(id_records_s1)
+    result = {
+        'n_examples': n,
+        'cls_accuracy': bootstrap_ci(cls_correct, n_resamples=n_resamples),
+        'span_exact':   bootstrap_ci(span_exact_vals, n_resamples=n_resamples),
+        'span_overlap': bootstrap_ci(span_overlap_vals, n_resamples=n_resamples),
+        'joint_f1':     bootstrap_ci(joint_correct, n_resamples=n_resamples),
+    }
+    return result
+
+
+def print_indonesian_ci(label, ci_result):
+    if ci_result is None:
+        print(f"\n  {label}  [no Indonesian examples found]")
+        return
+    print(f"\n  {label}  (n={ci_result['n_examples']}, 95% bootstrap CI, n_resamples=10,000)")
+    print(f"  {'Metric':<18} {'Point':<10} {'95% CI':<20}")
+    print(f"  {'-'*50}")
+    for key, label_str in [
+        ('cls_accuracy',  'Cls Accuracy'),
+        ('span_exact',    'Span Exact'),
+        ('span_overlap',  'Span Overlap F1'),
+        ('joint_f1',      'Joint F1'),
+    ]:
+        pt, lo, hi = ci_result[key]
+        print(f"  {label_str:<18} {pt:<10.4f} [{lo:.4f}, {hi:.4f}]")
+
+
 # ── System A: mBERT Stage 1 → mBERT Stage 2 ──────────────────────────────────
 
-def evaluate_system_a(s1_mbert, s2_mbert):
+def evaluate_system_a(s1_mbert, s2_mbert, n_bootstrap=10000):
     print("\n" + "="*60)
     print("System A: mBERT Stage 1 → mBERT Stage 2 (two-stage pipeline)")
     print("="*60)
@@ -325,9 +496,16 @@ def evaluate_system_a(s1_mbert, s2_mbert):
     print(f"\n  Joint F1 breakdown:")
     for lang, d in joint_f1.items():
         if isinstance(d, dict):
-            print(f"    {lang:<10} macro={d['macro_f1']:.4f}" + (f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else "") + "  "
+            suffix = f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else ""
+            print(f"    {lang:<10} macro={d['macro_f1']:.4f}{suffix}  "
                   f"literal: P={d['literal']['P']:.4f} R={d['literal']['R']:.4f} F1={d['literal']['F1']:.4f}  "
                   f"idiomatic: P={d['idiomatic']['P']:.4f} R={d['idiomatic']['R']:.4f} F1={d['idiomatic']['F1']:.4f}")
+
+    stability = compute_stability(joint_f1)
+    print_stability_table("Stability metrics (in-distribution languages):", stability)
+
+    id_ci = compute_indonesian_bootstrap(s1_mbert, s2_mbert, n_resamples=n_bootstrap)
+    print_indonesian_ci("Indonesian held-out generalization:", id_ci)
 
     return {
         'cls_f1':          cls_results,
@@ -336,12 +514,14 @@ def evaluate_system_a(s1_mbert, s2_mbert):
         'span_correct_id': {'exact': exact_corr, 'overlap': overlap_corr},
         'joint_acc':       round(joint_acc, 4),
         'joint_f1':        joint_f1,
+        'stability':       stability,
+        'indonesian_ci':   id_ci,
     }
 
 
 # ── System B: GPT-4o Stage 1 → GPT-4o Stage 2 ────────────────────────────────
 
-def evaluate_system_b(s1_gpt, s2_gpt):
+def evaluate_system_b(s1_gpt, s2_gpt, n_bootstrap=10000):
     print("\n" + "="*60)
     print("System B: GPT-4o Stage 1 → GPT-4o Stage 2 (two-stage pipeline)")
     print("="*60)
@@ -371,9 +551,16 @@ def evaluate_system_b(s1_gpt, s2_gpt):
     print(f"\n  Joint F1 breakdown:")
     for lang, d in joint_f1.items():
         if isinstance(d, dict):
-            print(f"    {lang:<10} macro={d['macro_f1']:.4f}" + (f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else "") + "  "
+            suffix = f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else ""
+            print(f"    {lang:<10} macro={d['macro_f1']:.4f}{suffix}  "
                   f"literal: P={d['literal']['P']:.4f} R={d['literal']['R']:.4f} F1={d['literal']['F1']:.4f}  "
                   f"idiomatic: P={d['idiomatic']['P']:.4f} R={d['idiomatic']['R']:.4f} F1={d['idiomatic']['F1']:.4f}")
+
+    stability = compute_stability(joint_f1)
+    print_stability_table("Stability metrics (in-distribution languages):", stability)
+
+    id_ci = compute_indonesian_bootstrap(s1_gpt, s2_gpt, n_resamples=n_bootstrap)
+    print_indonesian_ci("Indonesian held-out generalization:", id_ci)
 
     return {
         'cls_f1':          cls_results,
@@ -382,12 +569,14 @@ def evaluate_system_b(s1_gpt, s2_gpt):
         'span_correct_id': {'exact': exact_corr, 'overlap': overlap_corr},
         'joint_acc':       round(joint_acc, 4),
         'joint_f1':        joint_f1,
+        'stability':       stability,
+        'indonesian_ci':   id_ci,
     }
 
 
 # ── System C: GPT-4o Single-Stage ────────────────────────────────────────────
 
-def evaluate_system_c(single_gpt):
+def evaluate_system_c(single_gpt, n_bootstrap=10000):
     print("\n" + "="*60)
     print("System C: GPT-4o Single-Stage (classify + extract in one prompt)")
     print("="*60)
@@ -405,7 +594,6 @@ def evaluate_system_c(single_gpt):
     exact_idio, overlap_idio = span_f1_per_lang(idiomatic_records)
     print_span_table("Span Extraction (Idiomatic Only):", exact_idio, overlap_idio)
 
-    # E2E: zero span where cls is wrong
     e2e_records = []
     for r in idiomatic_records:
         cls_correct = r.get('pred_label') == r.get('idiomaticity')
@@ -422,17 +610,25 @@ def evaluate_system_c(single_gpt):
     print_span_table("Span F1 (Correct Identifications Only):", exact_corr, overlap_corr)
 
     joint_acc, n_correct, n_total = compute_joint_acc(
-        single_gpt, single_gpt, pred_label_key='pred_label'
-    )
+        single_gpt, single_gpt, pred_label_key='pred_label')
     print(f"\n  Joint accuracy (cls + span both correct): {joint_acc:.4f} ({n_correct}/{n_total})")
 
     joint_f1 = compute_joint_f1(single_gpt, single_gpt, pred_label_key='pred_label')
     print(f"\n  Joint F1 breakdown:")
     for lang, d in joint_f1.items():
         if isinstance(d, dict):
-            print(f"    {lang:<10} macro={d['macro_f1']:.4f}" + (f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else "") + "  "
+            suffix = f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else ""
+            print(f"    {lang:<10} macro={d['macro_f1']:.4f}{suffix}  "
                   f"literal: P={d['literal']['P']:.4f} R={d['literal']['R']:.4f} F1={d['literal']['F1']:.4f}  "
                   f"idiomatic: P={d['idiomatic']['P']:.4f} R={d['idiomatic']['R']:.4f} F1={d['idiomatic']['F1']:.4f}")
+
+    stability = compute_stability(joint_f1)
+    print_stability_table("Stability metrics (in-distribution languages):", stability)
+
+    id_ci = compute_indonesian_bootstrap(single_gpt, single_gpt,
+                                         pred_label_key='pred_label',
+                                         n_resamples=n_bootstrap)
+    print_indonesian_ci("Indonesian held-out generalization:", id_ci)
 
     return {
         'cls_f1':          cls_results,
@@ -441,12 +637,14 @@ def evaluate_system_c(single_gpt):
         'span_correct_id': {'exact': exact_corr, 'overlap': overlap_corr},
         'joint_acc':       round(joint_acc, 4),
         'joint_f1':        joint_f1,
+        'stability':       stability,
+        'indonesian_ci':   id_ci,
     }
 
 
 # ── System D: mBERT Stage 1 → Joint span head ────────────────────────────────
 
-def evaluate_system_d(s1_mbert, span2_joint):
+def evaluate_system_d(s1_mbert, span2_joint, n_bootstrap=10000):
     print("\n" + "="*60)
     print("System D: mBERT Stage 1 → Joint Model Span Head")
     print("="*60)
@@ -476,9 +674,16 @@ def evaluate_system_d(s1_mbert, span2_joint):
     print(f"\n  Joint F1 breakdown:")
     for lang, d in joint_f1.items():
         if isinstance(d, dict):
-            print(f"    {lang:<10} macro={d['macro_f1']:.4f}" + (f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else "") + "  "
+            suffix = f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else ""
+            print(f"    {lang:<10} macro={d['macro_f1']:.4f}{suffix}  "
                   f"literal: P={d['literal']['P']:.4f} R={d['literal']['R']:.4f} F1={d['literal']['F1']:.4f}  "
                   f"idiomatic: P={d['idiomatic']['P']:.4f} R={d['idiomatic']['R']:.4f} F1={d['idiomatic']['F1']:.4f}")
+
+    stability = compute_stability(joint_f1)
+    print_stability_table("Stability metrics (in-distribution languages):", stability)
+
+    id_ci = compute_indonesian_bootstrap(s1_mbert, span2_joint, n_resamples=n_bootstrap)
+    print_indonesian_ci("Indonesian held-out generalization:", id_ci)
 
     return {
         'cls_f1':          cls_results,
@@ -487,12 +692,14 @@ def evaluate_system_d(s1_mbert, span2_joint):
         'span_correct_id': {'exact': exact_corr, 'overlap': overlap_corr},
         'joint_acc':       round(joint_acc, 4),
         'joint_f1':        joint_f1,
+        'stability':       stability,
+        'indonesian_ci':   id_ci,
     }
 
 
 # ── System E: Joint mBERT end-to-end ─────────────────────────────────────────
 
-def evaluate_system_e(joint_preds):
+def evaluate_system_e(joint_preds, n_bootstrap=10000):
     print("\n" + "="*60)
     print("System E: Joint mBERT (single model — classify + span)")
     print("="*60)
@@ -512,7 +719,6 @@ def evaluate_system_e(joint_preds):
     exact_idio, overlap_idio = span_f1_per_lang(idiomatic_records)
     print_span_table("Span Extraction (idiomatic only):", exact_idio, overlap_idio)
 
-    # E2E: zero span where cls is wrong (consistent with pipeline systems)
     e2e_records = []
     for r in idiomatic_records:
         cls_correct = r.get('pred_idiomaticity') == r.get('idiomaticity')
@@ -530,7 +736,6 @@ def evaluate_system_e(joint_preds):
     exact_corr, overlap_corr = span_f1_per_lang(correct_records)
     print_span_table("Span F1 (Correct Identifications Only):", exact_corr, overlap_corr)
 
-    # Use shared helper for consistent joint_acc definition
     joint_acc, n_correct, n_total = compute_joint_acc(joint_preds, joint_preds)
     print(f"\n  Joint accuracy (cls + span both correct): {joint_acc:.4f} ({n_correct}/{n_total})")
 
@@ -538,9 +743,16 @@ def evaluate_system_e(joint_preds):
     print(f"\n  Joint F1 breakdown:")
     for lang, d in joint_f1.items():
         if isinstance(d, dict):
-            print(f"    {lang:<10} macro={d['macro_f1']:.4f}" + (f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else "") + "  "
+            suffix = f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else ""
+            print(f"    {lang:<10} macro={d['macro_f1']:.4f}{suffix}  "
                   f"literal: P={d['literal']['P']:.4f} R={d['literal']['R']:.4f} F1={d['literal']['F1']:.4f}  "
                   f"idiomatic: P={d['idiomatic']['P']:.4f} R={d['idiomatic']['R']:.4f} F1={d['idiomatic']['F1']:.4f}")
+
+    stability = compute_stability(joint_f1)
+    print_stability_table("Stability metrics (in-distribution languages):", stability)
+
+    id_ci = compute_indonesian_bootstrap(joint_preds, joint_preds, n_resamples=n_bootstrap)
+    print_indonesian_ci("Indonesian held-out generalization:", id_ci)
 
     return {
         'cls_f1':          cls_results,
@@ -549,19 +761,20 @@ def evaluate_system_e(joint_preds):
         'span_correct_id': {'exact': exact_corr, 'overlap': overlap_corr},
         'joint_acc':       round(joint_acc, 4),
         'joint_f1':        joint_f1,
+        'stability':       stability,
+        'indonesian_ci':   id_ci,
     }
 
 
 # ── System F: Sequential Phase 1 → Phase 2 ───────────────────────────────────
 
-def evaluate_system_f(seq_phase1, seq_phase2):
+def evaluate_system_f(seq_phase1, seq_phase2, n_bootstrap=10000):
     """
     System F: Sequential two-phase mBERT.
       Phase 1 (cls-dominant, 0.7/0.3) provides classification decisions.
       Phase 2 (span-dominant, 0.3/0.7, fine-tuned from Phase 1) provides spans.
-    The key distinction from System A is that Phase 2's encoder was initialised
-    from Phase 1 weights, so it learned span extraction on top of a representation
-    that already encodes idiomaticity — rather than from scratch.
+    Phase 2's encoder was initialised from Phase 1 weights, so span extraction
+    is learned on top of a representation that already encodes idiomaticity.
     """
     print("\n" + "="*60)
     print("System F: Sequential mBERT (Phase 1 cls → Phase 2 span fine-tune)")
@@ -571,20 +784,16 @@ def evaluate_system_f(seq_phase1, seq_phase2):
         print("  ✗ Missing prediction files — run Train_Sequential.py first")
         return None
 
-    # Phase 1 — classification
     cls_results = cls_f1_per_lang(list(seq_phase1.values()), pred_key='pred_idiomaticity')
     print_cls_table("Phase 1 Classification:", cls_results)
 
-    # Phase 2 — span (standalone, conditioned on Phase 1 encoder)
     exact_p2, overlap_p2 = span_f1_per_lang(list(seq_phase2.values()))
     print_span_table("Phase 2 Span (standalone):", exact_p2, overlap_p2)
 
-    # End-to-end: Phase 1 cls decision gates Phase 2 span
     pipeline_records = build_pipeline_records(seq_phase1, seq_phase2, only_correct_cls=False)
     exact_e2e, overlap_e2e = span_f1_per_lang(pipeline_records)
     print_span_table("Full Sequential Pipeline (end-to-end):", exact_e2e, overlap_e2e)
 
-    # Conditioned on correct Phase 1 identification
     correct_records = build_pipeline_records(seq_phase1, seq_phase2, only_correct_cls=True)
     exact_corr, overlap_corr = span_f1_per_lang(correct_records)
     print_span_table("Span F1 (Correct Phase 1 Identifications Only):", exact_corr, overlap_corr)
@@ -596,9 +805,16 @@ def evaluate_system_f(seq_phase1, seq_phase2):
     print(f"\n  Joint F1 breakdown:")
     for lang, d in joint_f1.items():
         if isinstance(d, dict):
-            print(f"    {lang:<10} macro={d['macro_f1']:.4f}" + (f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else "") + "  "
+            suffix = f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else ""
+            print(f"    {lang:<10} macro={d['macro_f1']:.4f}{suffix}  "
                   f"literal: P={d['literal']['P']:.4f} R={d['literal']['R']:.4f} F1={d['literal']['F1']:.4f}  "
                   f"idiomatic: P={d['idiomatic']['P']:.4f} R={d['idiomatic']['R']:.4f} F1={d['idiomatic']['F1']:.4f}")
+
+    stability = compute_stability(joint_f1)
+    print_stability_table("Stability metrics (in-distribution languages):", stability)
+
+    id_ci = compute_indonesian_bootstrap(seq_phase1, seq_phase2, n_resamples=n_bootstrap)
+    print_indonesian_ci("Indonesian held-out generalization:", id_ci)
 
     return {
         'cls_f1':          cls_results,
@@ -607,19 +823,22 @@ def evaluate_system_f(seq_phase1, seq_phase2):
         'span_correct_id': {'exact': exact_corr, 'overlap': overlap_corr},
         'joint_acc':       round(joint_acc, 4),
         'joint_f1':        joint_f1,
+        'stability':       stability,
+        'indonesian_ci':   id_ci,
     }
 
 
 # ── System G: BIO Tagger ─────────────────────────────────────────────────────
 
-def evaluate_system_g(bio_preds):
+def evaluate_system_g(bio_preds, n_bootstrap=10000):
     """
     System G: mBERT BIO token-level tagger.
     Pure span extraction — each token labelled B-IDIOM / I-IDIOM / O.
     No classification head; evaluated on span quality only.
 
-    For Joint F1 we treat every example as needing a span (no cls gate),
-    so the joint metric here is purely span quality across all examples.
+    FIX: Previous version read a non-existent 'span_exact_match' field for
+    joint_acc, always returning 0.0. Now computed correctly from
+    pred_span_start/end vs gold span_start/end.
     """
     print("\n" + "="*60)
     print("System G: BIO Token-Level Tagger (span extraction only)")
@@ -631,27 +850,34 @@ def evaluate_system_g(bio_preds):
 
     records = list(bio_preds.values())
 
-    # Span on all examples
     exact_all, overlap_all = span_f1_per_lang(records)
     print_span_table("Span Extraction (all examples):", exact_all, overlap_all)
 
-    # Span on idiomatic-only (comparable to other systems' E2E metric)
     idiomatic_records = [r for r in records if r['idiomaticity'] == 'idiomatic']
     exact_idio, overlap_idio = span_f1_per_lang(idiomatic_records)
     print_span_table("Span Extraction (idiomatic only):", exact_idio, overlap_idio)
 
-    # Literal-only — should score low (no meaningful span, but model still predicts one)
     literal_records = [r for r in records if r['idiomaticity'] == 'literal']
     if literal_records:
         exact_lit, overlap_lit = span_f1_per_lang(literal_records)
         print_span_table("Span Extraction (literal only — diagnostic):", exact_lit, overlap_lit)
 
-    # Joint F1: no cls head, so we treat every example as if cls is always correct
-    # and judge purely on span overlap. This is the "span-only" upper bound.
-    # We pass bio_preds as both s1 and s2; compute_joint_f1 uses s1 for cls label
-    # and s2 for span — since there's no pred_idiomaticity, it will default to None
-    # and score 0 for all idiomatic examples unless we supply a synthetic cls label.
-    # Instead, compute a clean span-only joint F1 directly here.
+    # ── FIXED: compute joint_acc correctly ────────────────────────────────────
+    # BIO tagger has no classifier — treat every example as needing a span.
+    # Joint is correct iff pred span exactly matches gold span.
+    correct_exact = 0
+    total         = 0
+    for r in records:
+        gold_s = r['span_start']
+        gold_e = r['span_end']
+        pred_s = r.get('pred_span_start')
+        pred_e = r.get('pred_span_end')
+        correct_exact += int(pred_s == gold_s and pred_e == gold_e) if pred_s is not None else 0
+        total += 1
+    joint_acc_bio = correct_exact / total if total > 0 else 0.0
+    print(f"\n  Joint accuracy (span exact match, no cls gate): {joint_acc_bio:.4f} ({correct_exact}/{total})")
+
+    # Span-only Joint F1 (any overlap = correct) — for comparability with other systems
     lang_gold = defaultdict(list)
     lang_pred = defaultdict(list)
     for r in records:
@@ -675,21 +901,55 @@ def evaluate_system_g(bio_preds):
     span_joint_f1['Overall'] = round(f1_score(all_g, all_p, average='macro'), 4)
     print(f"\n  Span-only Joint F1 (any overlap = correct): {span_joint_f1}")
 
+    # Stability on span-only Joint F1
+    stability = compute_stability(span_joint_f1)
+    print_stability_table("Stability metrics (in-distribution languages):", stability)
+
+    # Indonesian bootstrap — span only, no cls gate
+    id_records = [r for r in records if r['language'] == HELD_OUT_LANG]
+    id_ci = None
+    if id_records:
+        exact_vals   = []
+        overlap_vals = []
+        for r in id_records:
+            gold_s = r['span_start']
+            gold_e = r['span_end']
+            pred_s = r.get('pred_span_start')
+            pred_e = r.get('pred_span_end')
+            exact_vals.append(int(pred_s == gold_s and pred_e == gold_e) if pred_s is not None else 0)
+            overlap_vals.append(compute_overlap_f1(pred_s, pred_e, gold_s, gold_e)
+                                 if pred_s is not None else 0.0)
+        id_ci = {
+            'n_examples': len(id_records),
+            'cls_accuracy': (None, None, None),   # no classifier
+            'span_exact':   bootstrap_ci(exact_vals,   n_resamples=n_bootstrap),
+            'span_overlap': bootstrap_ci(overlap_vals, n_resamples=n_bootstrap),
+            'joint_f1':     bootstrap_ci(overlap_vals, n_resamples=n_bootstrap),  # overlap as proxy
+        }
+        print(f"\n  Indonesian held-out generalization (n={len(id_records)}, 95% bootstrap CI)")
+        print(f"  {'Metric':<18} {'Point':<10} {'95% CI':<20}")
+        print(f"  {'-'*50}")
+        for key, label_str in [('span_exact', 'Span Exact'), ('span_overlap', 'Span Overlap F1')]:
+            pt, lo, hi = id_ci[key]
+            print(f"  {label_str:<18} {pt:<10.4f} [{lo:.4f}, {hi:.4f}]")
+
     return {
         'cls_f1':          None,   # no classifier
         'span_all':        {'exact': exact_all,  'overlap': overlap_all},
         'span_e2e':        {'exact': exact_idio, 'overlap': overlap_idio},
         'span_correct_id': {'exact': exact_idio, 'overlap': overlap_idio},
-        'joint_acc':       round(float(np.mean([r.get('span_exact_match', 0)
-                                                for r in records])), 4),
+        'joint_acc':       round(joint_acc_bio, 4),  # FIXED
         'joint_f1':        span_joint_f1,
+        'stability':       stability,
+        'indonesian_ci':   id_ci,
     }
 
 
 # ── Summary table ─────────────────────────────────────────────────────────────
 
-def print_summary(results_a, results_b, results_c, results_d, results_e, results_f, results_g):
-    LANGS = ['English', 'Spanish', 'Hindi', 'Telugu'] # Added Spanish
+def print_summary(results_a, results_b, results_c, results_d,
+                  results_e, results_f, results_g):
+    LANGS = ['English', 'Spanish', 'Hindi', 'Telugu']
 
     systems = [
         ("A: mBERT Pipeline (S1→S2)",        results_a),
@@ -746,7 +1006,7 @@ def print_summary(results_a, results_b, results_c, results_d, results_e, results
         if not res or res.get('cls_f1') is None:
             print(f"{label:<45} " + "".join(f"{'—':<14}" for _ in LANGS) + f"{'—':<10}")
             continue
-        cf = res['cls_f1']
+        cf  = res['cls_f1']
         row = f"{label:<45} " + "".join(f"{fmt(cf.get(l, '—')):<14}" for l in LANGS)
         row += f"{fmt(cf.get('Overall', '—')):<10}"
         print(row)
@@ -765,16 +1025,14 @@ def print_summary(results_a, results_b, results_c, results_d, results_e, results
         if sf == '—' or not isinstance(sf, dict):
             print(f"{label:<45} " + "".join(f"{'—':<14}" for _ in LANGS) + f"{'—':<10}")
             continue
-        row = f"{label:<45} " + "".join(f"{fmt(sf.get(l, '—')):<14}" for l in LANGS)
+        row  = f"{label:<45} " + "".join(f"{fmt(sf.get(l, '—')):<14}" for l in LANGS)
         row += f"{fmt(sf.get('Overall', '—')):<10}"
         print(row)
 
     # ── Per-language Joint F1 ─────────────────────────────────────────────────
-# ── Per-language Classification F1 ────────────────────────────────────────
-# ── Per-language Joint F1 ─────────────────────────────────────────────────
-    print(f"\n{'─'*122}") 
-    print("Joint F1 — Per Language  (pooled/macro-avg across all examples)")
-    print(f"{'─'*122}") 
+    print(f"\n{'─'*122}")
+    print("Joint F1 — Per Language  (macro-avg across in-distribution languages)")
+    print(f"{'─'*122}")
     print(lhdr)
     print("-" * len(lhdr))
     for label, res in systems:
@@ -787,7 +1045,7 @@ def print_summary(results_a, results_b, results_c, results_d, results_e, results
             continue
         def jf_macro(d):
             return d.get('macro_avg_f1', d.get('macro_f1')) if isinstance(d, dict) else d
-        row = f"{label:<45} " + "".join(f"{fmt(jf_macro(jf.get(l, '—'))):<14}" for l in LANGS)
+        row  = f"{label:<45} " + "".join(f"{fmt(jf_macro(jf.get(l, '—'))):<14}" for l in LANGS)
         row += f"{fmt(jf_macro(jf.get('Overall', '—'))):<10}"
         print(row)
 
@@ -805,9 +1063,50 @@ def print_summary(results_a, results_b, results_c, results_d, results_e, results
         if sf == '—' or not isinstance(sf, dict):
             print(f"{label:<45} " + "".join(f"{'—':<14}" for _ in LANGS) + f"{'—':<10}")
             continue
-        row = f"{label:<45} " + "".join(f"{fmt(sf.get(l, '—')):<14}" for l in LANGS)
+        row  = f"{label:<45} " + "".join(f"{fmt(sf.get(l, '—')):<14}" for l in LANGS)
         row += f"{fmt(sf.get('Overall', '—')):<10}"
         print(row)
+
+    # ── Stability metrics ─────────────────────────────────────────────────────
+    print(f"\n{'─'*122}")
+    print("Stability Metrics — Joint F1 across In-Distribution Languages")
+    print(f"  (Stability = Mean − Std: higher = better average AND more consistent)")
+    print(f"{'─'*122}")
+    shdr = f"{'System':<45} {'Mean':<10} {'Std':<10} {'Worst Lang':<16} {'Worst F1':<12} {'Gap':<10} {'Stability':<12}"
+    print(shdr)
+    print("-" * len(shdr))
+    for label, res in systems:
+        if not res or not res.get('stability'):
+            print(f"{label:<45} " + "—")
+            continue
+        s = res['stability']
+        print(f"{label:<45} {fmt(s.get('mean_joint')):<10} {fmt(s.get('std_joint')):<10} "
+              f"{s.get('worst_lang','—'):<16} {fmt(s.get('worst_f1')):<12} "
+              f"{fmt(s.get('gap')):<10} {fmt(s.get('stability')):<12}")
+
+    # ── Indonesian held-out results ───────────────────────────────────────────
+    print(f"\n{'─'*108}")
+    print("Indonesian Held-Out Generalization — 95% Bootstrap CIs  (n≈33 test examples)")
+    print(f"  Indonesian is excluded from all training; results are zero-shot cross-lingual transfer.")
+    print(f"{'─'*108}")
+    ihdr = f"{'System':<45} {'Cls Acc':<22} {'Span Exact':<22} {'Span Overlap':<22} {'Joint F1':<22}"
+    print(ihdr)
+    print("-" * len(ihdr))
+    for label, res in systems:
+        if not res or not res.get('indonesian_ci'):
+            print(f"{label:<45} " + "  [no data]")
+            continue
+        ci = res['indonesian_ci']
+        def fmt_ci(tup):
+            if tup is None or tup[0] is None:
+                return "— (no cls)"
+            pt, lo, hi = tup
+            return f"{pt:.4f} [{lo:.4f},{hi:.4f}]"
+        print(f"{label:<45} "
+              f"{fmt_ci(ci.get('cls_accuracy')):<22} "
+              f"{fmt_ci(ci.get('span_exact')):<22} "
+              f"{fmt_ci(ci.get('span_overlap')):<22} "
+              f"{fmt_ci(ci.get('joint_f1')):<22}")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -839,8 +1138,8 @@ def main():
     print(f"  Sequential Ph1   : {len(seq_phase1)} predictions")
     print(f"  Sequential Ph2   : {len(seq_phase2)} predictions")
     print(f"  BIO Tagger       : {len(bio_preds)} predictions")
+    print(f"  Bootstrap resamples: {args.n_bootstrap}")
 
-    # Intersect all non-empty prediction sets for fair comparison
     all_keys = [set(d) for d in [s1_mbert, s2_mbert, s1_gpt, s2_gpt,
                                   single_gpt, joint_preds, span2_joint,
                                   seq_phase1, seq_phase2, bio_preds] if d]
@@ -862,19 +1161,18 @@ def main():
 
     print(f"  After filtering: {len(s1_mbert)} examples per system\n")
 
-    # Run all evaluations
-    results_a = evaluate_system_a(s1_mbert, s2_mbert)
-    results_b = evaluate_system_b(s1_gpt, s2_gpt)
-    results_c = evaluate_system_c(single_gpt)
-    results_d = evaluate_system_d(s1_mbert, span2_joint)
-    results_e = evaluate_system_e(joint_preds)
-    results_f = evaluate_system_f(seq_phase1, seq_phase2)
-    results_g = evaluate_system_g(bio_preds)
+    nb = args.n_bootstrap
+    results_a = evaluate_system_a(s1_mbert, s2_mbert, n_bootstrap=nb)
+    results_b = evaluate_system_b(s1_gpt, s2_gpt, n_bootstrap=nb)
+    results_c = evaluate_system_c(single_gpt, n_bootstrap=nb)
+    results_d = evaluate_system_d(s1_mbert, span2_joint, n_bootstrap=nb)
+    results_e = evaluate_system_e(joint_preds, n_bootstrap=nb)
+    results_f = evaluate_system_f(seq_phase1, seq_phase2, n_bootstrap=nb)
+    results_g = evaluate_system_g(bio_preds, n_bootstrap=nb)
 
-    # Summary
-    print_summary(results_a, results_b, results_c, results_d, results_e, results_f, results_g)
+    print_summary(results_a, results_b, results_c, results_d,
+                  results_e, results_f, results_g)
 
-    # Save
     all_results = {
         'system_a_mbert_pipeline':        results_a,
         'system_b_gpt_pipeline':          results_b,
@@ -885,7 +1183,7 @@ def main():
         'system_g_bio_tagger':            results_g,
     }
     out_path = output_dir / 'pipeline_eval_results.json'
-    json.dump(all_results, open(out_path, 'w'), indent=2)
+    json.dump(all_results, open(out_path, 'w'), indent=2, default=str)
     print(f"\nFull results saved → {out_path}")
 
 
