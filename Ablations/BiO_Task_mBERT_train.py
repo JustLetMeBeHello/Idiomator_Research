@@ -174,6 +174,9 @@ def align_bio_labels(offsets, word_ids, char_start, char_end, max_len):
     Returns a list of label IDs of length max_len.
     """
 
+    if char_start is None or char_end is None:
+        return None
+
     labels  = []
     prev_word_id = None
 
@@ -242,8 +245,8 @@ class BIODataset(Dataset):
                 char_start, char_end, max_len
             )
 
-            # Skip if no B-IDIOM token survived (span fully outside max_len)
-            if LABEL2ID['B-IDIOM'] not in labels:
+            # Skip if span was None or no B-IDIOM token survived (span fully outside max_len)
+            if labels is None or LABEL2ID['B-IDIOM'] not in labels:
                 skipped += 1
                 continue
 
