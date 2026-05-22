@@ -2,8 +2,14 @@
 run_eval.py
 
 Runs Full_evaluation.py for all 15 language combos, then summarizes the matrix.
-Run this after all 5 training scripts have completed.
-Same setup/run pattern as run_stage1.py — just swap the script name.
+
+Usage (in Colab):
+    !python Google_Colab/Language_Ablations/run_eval.py \
+        --ablation_dir /content/drive/MyDrive/IdiomBERT_Ablations/merged \
+        --eval_dir     /content/drive/MyDrive/IdiomBERT_Ablations/results \
+        --gpt_s1       models/gpt_baseline_stage1/test_predictions.jsonl \
+        --gpt_s2       models/gpt_baseline_stage2/test_predictions.jsonl \
+        --gpt_single   models/gpt_single_stage/test_predictions.jsonl
 """
 
 from __future__ import annotations
@@ -53,12 +59,16 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--root",         default=".")
     p.add_argument("--python",       default=sys.executable)
-    p.add_argument("--ablation_dir", default="models/language_ablation_matrix")
-    p.add_argument("--eval_dir",     default="results/language_ablation_matrix")
-    p.add_argument("--log_dir",      default="results/language_ablation_matrix/logs")
-    p.add_argument("--checkpoint_dir", default="results/language_ablation_matrix/job_checkpoints")
-    p.add_argument("--only_combo",   default=None)
-    p.add_argument("--keep_checkpoints", action="store_true")
+    p.add_argument("--ablation_dir", default="/content/drive/MyDrive/IdiomBERT_Ablations/merged")
+    p.add_argument("--eval_dir",     default="/content/drive/MyDrive/IdiomBERT_Ablations/results")
+    p.add_argument("--log_dir",      default="/content/drive/MyDrive/IdiomBERT_Ablations/results/logs")
+    p.add_argument("--checkpoint_dir", default="/content/drive/MyDrive/IdiomBERT_Ablations/results/job_checkpoints")
+    # GPT files are global (same for every combo) — lives in the repo
+    p.add_argument("--gpt_s1",     default="models/gpt_baseline_stage1/test_predictions.jsonl")
+    p.add_argument("--gpt_s2",     default="models/gpt_baseline_stage2/test_predictions.jsonl")
+    p.add_argument("--gpt_single", default="models/gpt_single_stage/test_predictions.jsonl")
+    p.add_argument("--only_combo", default=None)
+    p.add_argument("--force",      action="store_true", help="Re-run even if already done")
     return p.parse_args()
 
 
@@ -66,19 +76,12 @@ def checkpoint_path(args: argparse.Namespace, job: Job) -> Path:
     return Path(args.checkpoint_dir) / f"{job.name}.json"
 
 
-def checkpoint_done(args: argparse.Namespace, job: Job) -> bool:
-    path = checkpoint_path(args, job)
-    if not path.exists():
+def is_done(args: argparse.Namespace, job: Job) -> bool:
+    if args.force:
         return False
-    try:
-        with path.open(encoding="utf-8") as f:
-            return json.load(f).get("status") == "done"
-    except (json.JSONDecodeError, OSError):
-        return False
-
-
-def expected_done(args: argparse.Namespace, job: Job) -> bool:
-    return (Path(args.eval_dir) / job.combo / "pipeline_eval_results.json").exists()
+    # Only consider done if the output file actually exists and is non-empty
+    out = Path(args.eval_dir) / job.combo / "pipeline_eval_results.json"
+    return out.exists() and out.stat().st_size > 0
 
 
 def mark_done(args: argparse.Namespace, job: Job) -> None:
@@ -109,22 +112,6 @@ def run_live(args: argparse.Namespace, job: Job, cmd: list[str]) -> None:
         raise subprocess.CalledProcessError(rc, cmd)
 
 
-def cleanup_checkpoints(args: argparse.Namespace, combo: str) -> None:
-    if args.keep_checkpoints:
-        return
-    base = Path(args.ablation_dir) / combo
-    for rel in [
-        "stage1_mbert/best_model",
-        "stage2_mbert/best_model",
-        "joint_mbert/best_model",
-        "sequential_mbert/phase1/best_model",
-        "sequential_mbert/phase2/best_model",
-        "bio_tagger/best_model",
-    ]:
-        import shutil
-        shutil.rmtree(base / rel, ignore_errors=True)
-
-
 def main() -> None:
     args = parse_args()
     args.root = str(Path(args.root).resolve())
@@ -134,6 +121,11 @@ def main() -> None:
 
     print(f"System        : {SYSTEM}")
     print(f"Root          : {args.root}")
+    print(f"Ablation dir  : {args.ablation_dir}")
+    print(f"Eval dir      : {args.eval_dir}")
+    print(f"GPT stage1    : {args.gpt_s1}")
+    print(f"GPT stage2    : {args.gpt_s2}")
+    print(f"GPT single    : {args.gpt_single}")
 
     jobs = [
         Job(combo=combo)
@@ -143,25 +135,30 @@ def main() -> None:
 
     completed = 0
     for job in tqdm(jobs, desc="eval jobs", unit="combo"):
-        if checkpoint_done(args, job) or expected_done(args, job):
+        if is_done(args, job):
             mark_done(args, job)
             tqdm.write(f"✓ skip {job.name}")
             completed += 1
             continue
 
-        base = Path(args.ablation_dir) / job.combo
+        base     = Path(args.ablation_dir) / job.combo
         eval_out = str(Path(args.eval_dir) / job.combo)
         Path(eval_out).mkdir(parents=True, exist_ok=True)
+
+        # Resolve GPT paths — relative paths are relative to repo root
+        def gpt_path(p):
+            p = Path(p)
+            return str(p) if p.is_absolute() else str(Path(args.root) / p)
 
         cmd = [
             args.python, "-u", "Evaluation/Full_evaluation.py",
             "--stage1_mbert", str(base / "stage1_mbert/test_predictions.jsonl"),
             "--stage2_mbert", str(base / "stage2_mbert/test_predictions.jsonl"),
-            "--stage1_gpt",   str(base / "missing_gpt_stage1.jsonl"),
-            "--stage2_gpt",   str(base / "missing_gpt_stage2.jsonl"),
-            "--single_gpt",   str(base / "missing_gpt_single.jsonl"),
+            "--stage1_gpt",   gpt_path(args.gpt_s1),
+            "--stage2_gpt",   gpt_path(args.gpt_s2),
+            "--single_gpt",   gpt_path(args.gpt_single),
             "--joint_preds",  str(base / "joint_mbert/test_predictions.jsonl"),
-            "--span2_joint",  str(base / "missing_joint_span_only.jsonl"),
+            "--span2_joint",  str(base / "stage2_mbert/test_predictions.jsonl"),  # fallback to stage2
             "--seq_phase1",   str(base / "sequential_mbert/phase1/test_predictions.jsonl"),
             "--seq_phase2",   str(base / "sequential_mbert/phase2/test_predictions.jsonl"),
             "--bio_preds",    str(base / "bio_tagger/test_predictions.jsonl"),
@@ -169,10 +166,9 @@ def main() -> None:
         ]
         run_live(args, job, cmd)
         mark_done(args, job)
-        cleanup_checkpoints(args, job.combo)
         completed += 1
 
-    # Summarize the full matrix once all combos are done
+    # Summarize
     if not args.only_combo:
         print("\nSummarizing ablation matrix...", flush=True)
         subprocess.run(
