@@ -59,6 +59,7 @@ from sklearn.metrics import f1_score, precision_recall_fscore_support
 # It never appears in training. All Indonesian results are reported separately
 # with bootstrap CIs because the test set is only ~33 examples.
 HELD_OUT_LANG = "Indonesian"
+SMALL_LANGS = ["Hindi","Telugu"]
 
 # Languages that are part of in-distribution evaluation
 IN_DIST_LANGS = ["English", "Spanish", "Hindi", "Telugu"]
@@ -388,24 +389,24 @@ def bootstrap_ci(values, statistic_fn=np.mean, n_resamples=10000, ci=0.95, seed=
     return round(float(point), 4), round(lower, 4), round(upper, 4)
 
 
-def compute_indonesian_bootstrap(s1_preds, s2_preds,
+def compute_small_lang_bootstrap(s1_preds, s2_preds,
                                  pred_label_key='pred_idiomaticity',
                                  n_resamples=10000):
     """
-    Compute per-example joint correctness for Indonesian examples only,
+    Compute per-example joint correctness for Hindi and Telugu examples only,
     then bootstrap CI over those values.
 
     Returns dict with:
       cls_f1, span_exact, span_overlap, joint_f1 — each with (point, lo, hi)
     """
-    id_records_s1 = [r for r in s1_preds.values() if r['language'] == HELD_OUT_LANG]
-    if not id_records_s1:
+    small_lang_records = [r for r in s1_preds.values() if r['language'] in SMALL_LANGS]
+    if not small_lang_records:
         return None
 
     # Classification
-    cls_gold = [LABEL2ID.get(r['idiomaticity'], 1) for r in id_records_s1]
+    cls_gold = [LABEL2ID.get(r['idiomaticity'], 1) for r in small_lang_records]
     cls_pred = [LABEL2ID.get(r.get(pred_label_key, 'idiomatic'), 1)
-                for r in id_records_s1]
+                for r in small_lang_records]
     cls_correct = [int(g == p) for g, p in zip(cls_gold, cls_pred)]
 
     # Span
@@ -413,7 +414,7 @@ def compute_indonesian_bootstrap(s1_preds, s2_preds,
     span_overlap_vals = []
     joint_correct     = []
 
-    for r in id_records_s1:
+    for r in small_lang_records:
         gold_label = r['idiomaticity']
         pred_label = r.get(pred_label_key, 'idiomatic')
         gold_s = r['span_start']
@@ -436,7 +437,7 @@ def compute_indonesian_bootstrap(s1_preds, s2_preds,
         else:
             joint_correct.append(int(pred_label == 'idiomatic' and overlap > 0.0))
 
-    n = len(id_records_s1)
+    n = len(small_lang_records)
     result = {
         'n_examples': n,
         'cls_accuracy': bootstrap_ci(cls_correct, n_resamples=n_resamples),
@@ -447,9 +448,9 @@ def compute_indonesian_bootstrap(s1_preds, s2_preds,
     return result
 
 
-def print_indonesian_ci(label, ci_result):
+def print_small_lang_ci(label, ci_result):
     if ci_result is None:
-        print(f"\n  {label}  [no Indonesian examples found]")
+        print(f"\n  {label}  [no Hindi/Telugu examples found]")
         return
     print(f"\n  {label}  (n={ci_result['n_examples']}, 95% bootstrap CI, n_resamples=10,000)")
     print(f"  {'Metric':<18} {'Point':<10} {'95% CI':<20}")
@@ -462,7 +463,6 @@ def print_indonesian_ci(label, ci_result):
     ]:
         pt, lo, hi = ci_result[key]
         print(f"  {label_str:<18} {pt:<10.4f} [{lo:.4f}, {hi:.4f}]")
-
 
 # ── System A: mBERT Stage 1 → mBERT Stage 2 ──────────────────────────────────
 
@@ -504,8 +504,9 @@ def evaluate_system_a(s1_mbert, s2_mbert, n_bootstrap=10000):
     stability = compute_stability(joint_f1)
     print_stability_table("Stability metrics (in-distribution languages):", stability)
 
-    id_ci = compute_indonesian_bootstrap(s1_mbert, s2_mbert, n_resamples=n_bootstrap)
-    print_indonesian_ci("Indonesian held-out generalization:", id_ci)
+    small_lang_ci = compute_small_lang_bootstrap(s1_mbert, s2_mbert, n_resamples=n_bootstrap)
+    print_small_lang_ci("Hindi/Telugu held-out generalization:", small_lang_ci)
+
 
     return {
         'cls_f1':          cls_results,
@@ -515,7 +516,7 @@ def evaluate_system_a(s1_mbert, s2_mbert, n_bootstrap=10000):
         'joint_acc':       round(joint_acc, 4),
         'joint_f1':        joint_f1,
         'stability':       stability,
-        'indonesian_ci':   id_ci,
+        'small_lang_ci': small_lang_ci,
     }
 
 
@@ -559,8 +560,9 @@ def evaluate_system_b(s1_gpt, s2_gpt, n_bootstrap=10000):
     stability = compute_stability(joint_f1)
     print_stability_table("Stability metrics (in-distribution languages):", stability)
 
-    id_ci = compute_indonesian_bootstrap(s1_gpt, s2_gpt, n_resamples=n_bootstrap)
-    print_indonesian_ci("Indonesian held-out generalization:", id_ci)
+    small_lang_ci = compute_small_lang_bootstrap(s1_mbert, s2_mbert, n_resamples=n_bootstrap)
+    print_small_lang_ci("Hindi/Telugu held-out generalization:", small_lang_ci)
+
 
     return {
         'cls_f1':          cls_results,
@@ -570,8 +572,9 @@ def evaluate_system_b(s1_gpt, s2_gpt, n_bootstrap=10000):
         'joint_acc':       round(joint_acc, 4),
         'joint_f1':        joint_f1,
         'stability':       stability,
-        'indonesian_ci':   id_ci,
+        'small_lang_ci': small_lang_ci,
     }
+
 
 
 # ── System C: GPT-4o Single-Stage ────────────────────────────────────────────
@@ -625,21 +628,21 @@ def evaluate_system_c(single_gpt, n_bootstrap=10000):
     stability = compute_stability(joint_f1)
     print_stability_table("Stability metrics (in-distribution languages):", stability)
 
-    id_ci = compute_indonesian_bootstrap(single_gpt, single_gpt,
-                                         pred_label_key='pred_label',
-                                         n_resamples=n_bootstrap)
-    print_indonesian_ci("Indonesian held-out generalization:", id_ci)
+    small_lang_ci = compute_small_lang_bootstrap(s1_mbert, s2_mbert, n_resamples=n_bootstrap)
+    print_small_lang_ci("Hindi/Telugu held-out generalization:", small_lang_ci)
+
 
     return {
         'cls_f1':          cls_results,
+        'span_standalone': {'exact': exact_ub,   'overlap': overlap_ub},
         'span_e2e':        {'exact': exact_e2e,  'overlap': overlap_e2e},
-        'span_idio':       {'exact': exact_idio, 'overlap': overlap_idio},
         'span_correct_id': {'exact': exact_corr, 'overlap': overlap_corr},
         'joint_acc':       round(joint_acc, 4),
         'joint_f1':        joint_f1,
         'stability':       stability,
-        'indonesian_ci':   id_ci,
+        'small_lang_ci': small_lang_ci,
     }
+
 
 
 # ── System D: mBERT Stage 1 → Joint span head ────────────────────────────────
@@ -682,8 +685,9 @@ def evaluate_system_d(s1_mbert, span2_joint, n_bootstrap=10000):
     stability = compute_stability(joint_f1)
     print_stability_table("Stability metrics (in-distribution languages):", stability)
 
-    id_ci = compute_indonesian_bootstrap(s1_mbert, span2_joint, n_resamples=n_bootstrap)
-    print_indonesian_ci("Indonesian held-out generalization:", id_ci)
+    small_lang_ci = compute_small_lang_bootstrap(s1_mbert, s2_mbert, n_resamples=n_bootstrap)
+    print_small_lang_ci("Hindi/Telugu held-out generalization:", small_lang_ci)
+
 
     return {
         'cls_f1':          cls_results,
@@ -693,8 +697,9 @@ def evaluate_system_d(s1_mbert, span2_joint, n_bootstrap=10000):
         'joint_acc':       round(joint_acc, 4),
         'joint_f1':        joint_f1,
         'stability':       stability,
-        'indonesian_ci':   id_ci,
+        'small_lang_ci': small_lang_ci,
     }
+
 
 
 # ── System E: Joint mBERT end-to-end ─────────────────────────────────────────
@@ -751,19 +756,21 @@ def evaluate_system_e(joint_preds, n_bootstrap=10000):
     stability = compute_stability(joint_f1)
     print_stability_table("Stability metrics (in-distribution languages):", stability)
 
-    id_ci = compute_indonesian_bootstrap(joint_preds, joint_preds, n_resamples=n_bootstrap)
-    print_indonesian_ci("Indonesian held-out generalization:", id_ci)
+    small_lang_ci = compute_small_lang_bootstrap(s1_mbert, s2_mbert, n_resamples=n_bootstrap)
+    print_small_lang_ci("Hindi/Telugu held-out generalization:", small_lang_ci)
+
 
     return {
         'cls_f1':          cls_results,
+        'span_standalone': {'exact': exact_ub,   'overlap': overlap_ub},
         'span_e2e':        {'exact': exact_e2e,  'overlap': overlap_e2e},
-        'span_idio':       {'exact': exact_idio, 'overlap': overlap_idio},
         'span_correct_id': {'exact': exact_corr, 'overlap': overlap_corr},
         'joint_acc':       round(joint_acc, 4),
         'joint_f1':        joint_f1,
         'stability':       stability,
-        'indonesian_ci':   id_ci,
+        'small_lang_ci': small_lang_ci,
     }
+
 
 
 # ── System F: Sequential Phase 1 → Phase 2 ───────────────────────────────────
@@ -813,19 +820,21 @@ def evaluate_system_f(seq_phase1, seq_phase2, n_bootstrap=10000):
     stability = compute_stability(joint_f1)
     print_stability_table("Stability metrics (in-distribution languages):", stability)
 
-    id_ci = compute_indonesian_bootstrap(seq_phase1, seq_phase2, n_resamples=n_bootstrap)
-    print_indonesian_ci("Indonesian held-out generalization:", id_ci)
+    small_lang_ci = compute_small_lang_bootstrap(s1_mbert, s2_mbert, n_resamples=n_bootstrap)
+    print_small_lang_ci("Hindi/Telugu held-out generalization:", small_lang_ci)
+
 
     return {
         'cls_f1':          cls_results,
-        'span_standalone': {'exact': exact_p2,   'overlap': overlap_p2},
+        'span_standalone': {'exact': exact_ub,   'overlap': overlap_ub},
         'span_e2e':        {'exact': exact_e2e,  'overlap': overlap_e2e},
         'span_correct_id': {'exact': exact_corr, 'overlap': overlap_corr},
         'joint_acc':       round(joint_acc, 4),
         'joint_f1':        joint_f1,
         'stability':       stability,
-        'indonesian_ci':   id_ci,
+        'small_lang_ci': small_lang_ci,
     }
+
 
 
 # ── System G: BIO Tagger ─────────────────────────────────────────────────────
