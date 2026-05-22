@@ -241,6 +241,21 @@ def main():
             gold_char_s = record['span_start']
             gold_char_e = record['span_end']
 
+            # Guard against missing gold spans in the data
+            if gold_char_s is None or gold_char_e is None:
+                result = {
+                    **record,
+                    'pred_span_text':  pred_text or '',
+                    'pred_span_start': pred_char_s,
+                    'pred_span_end':   pred_char_e,
+                    'exact_match':     False,
+                    'overlap_f1':      0.0,
+                }
+                predictions.append(result)
+                f_out.write(json.dumps(result, ensure_ascii=False) + '\n')
+                f_out.flush()
+                continue
+
             # Exact match (character level)
             exact = bool(
                 pred_char_s == gold_char_s and
