@@ -1,0 +1,19 @@
+{
+  "model_name": "bert-base-multilingual-cased",
+  "data_dir": "idioms_structured/Splits",
+  "output_dir": "models/stage1_mbert_en_hi_te",
+  "langs": [
+    "English",
+    "Hindi",
+    "Telugu",
+    "Spanish"
+  ],
+  "epochs": 7,
+  "batch_size": 32,
+  "lr": 3e-05,
+  "max_len": 128,
+  "warmup_ratio": 0.1,
+  "seed": 42,
+  "use_wandb": false,
+  "device": null
+}

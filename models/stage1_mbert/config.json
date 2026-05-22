@@ -1,0 +1,14 @@
+{
+  "model_name": "bert-base-multilingual-cased",
+  "data_dir": "Research_And_Training/idioms_structured/Splits",
+  "output_dir": "models/stage1_mbert",
+  "lang_filter": null,
+  "epochs": 5,
+  "batch_size": 32,
+  "lr": 3e-05,
+  "max_len": 128,
+  "warmup_ratio": 0.1,
+  "seed": 42,
+  "use_wandb": false,
+  "device": null
+}

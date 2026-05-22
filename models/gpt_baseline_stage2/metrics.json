@@ -1,0 +1,8 @@
+{
+  "model": "gpt-4o",
+  "test_size": 960,
+  "test_exact_match": 0.5958,
+  "test_overlap_f1": 0.7316,
+  "spans_not_found": 1,
+  "cost_estimate": 0.0718
+}

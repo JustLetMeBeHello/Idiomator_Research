@@ -1,0 +1,15 @@
+{
+  "best_dev_f1": 0.7993853327681221,
+  "best_epoch": 3,
+  "test_macro_f1": 0.7723658327099439,
+  "model": "bert-base-multilingual-cased",
+  "langs": [
+    "English",
+    "Hindi",
+    "Telugu",
+    "Spanish"
+  ],
+  "train_size": 5082,
+  "dev_size": 631,
+  "test_size": 632
+}

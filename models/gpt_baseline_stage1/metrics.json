@@ -1,0 +1,14 @@
+{
+  "model": "gpt-4o",
+  "test_size": 960,
+  "test_macro_f1": 0.7588,
+  "lang_f1": {
+    "English": 0.7992,
+    "Hindi": 0.5989,
+    "Indonesian": 0.7408,
+    "Spanish": 0.7793,
+    "Telugu": 0.7319
+  },
+  "cost_estimate": 0.12,
+  "unexpected_outputs": 0
+}

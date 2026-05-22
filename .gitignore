@@ -1,5 +1,5 @@
 # Models and checkpoints
-models/
+**/best_model/
 *.bin
 *.pt
 *.safetensors

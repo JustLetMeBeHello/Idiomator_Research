@@ -1,0 +1,17 @@
+{
+  "model": "bert-base-multilingual-cased",
+  "langs": [
+    "English",
+    "Hindi",
+    "Telugu",
+    "Spanish"
+  ],
+  "best_epoch": 5,
+  "best_dev_overlap": 0.729177331395007,
+  "test_exact_match": 0.3085,
+  "test_overlap_f1": 0.7161,
+  "train_size": 5081,
+  "dev_size": 631,
+  "test_size": 632,
+  "o_weight": 0.104
+}

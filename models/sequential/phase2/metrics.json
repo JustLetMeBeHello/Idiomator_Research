@@ -1,0 +1,20 @@
+{
+  "phase": 2,
+  "save_criterion": "overlap_f1",
+  "p2_cls_weight": 0.3,
+  "p2_span_weight": 0.7,
+  "unfreeze_top_layers": 3,
+  "initialized_from": "models/sequential/phase1",
+  "best_dev_overlap_f1": 0.8540542552035877,
+  "best_epoch": 4,
+  "test_cls_macro_f1": 0.773665612329484,
+  "test_span_exact": 0.6645569620253164,
+  "test_span_overlap": 0.8549641907278269,
+  "model": "bert-base-multilingual-cased",
+  "langs": [
+    "English",
+    "Hindi",
+    "Telugu",
+    "Spanish"
+  ]
+}
