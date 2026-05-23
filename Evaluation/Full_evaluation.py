@@ -634,15 +634,14 @@ def evaluate_system_c(single_gpt, n_bootstrap=10000):
 
     return {
         'cls_f1':          cls_results,
-        'span_standalone': {'exact': exact_ub,   'overlap': overlap_ub},
-        'span_e2e':        {'exact': exact_e2e,  'overlap': overlap_e2e},
-        'span_correct_id': {'exact': exact_corr, 'overlap': overlap_corr},
+        'span_standalone': {'exact': exact_idio,   'overlap': overlap_idio},
+        'span_e2e':        {'exact': exact_e2e,    'overlap': overlap_e2e},
+        'span_correct_id': {'exact': exact_corr,   'overlap': overlap_corr},
         'joint_acc':       round(joint_acc, 4),
         'joint_f1':        joint_f1,
         'stability':       stability,
-        'small_lang_ci': small_lang_ci,
+        'small_lang_ci':   small_lang_ci,
     }
-
 
 
 # ── System D: mBERT Stage 1 → Joint span head ────────────────────────────────
