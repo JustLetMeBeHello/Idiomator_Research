@@ -628,7 +628,7 @@ def evaluate_system_c(single_gpt, n_bootstrap=10000):
     stability = compute_stability(joint_f1)
     print_stability_table("Stability metrics (in-distribution languages):", stability)
 
-    small_lang_ci = compute_small_lang_bootstrap(single_gpt, n_resamples=n_bootstrap)
+    small_lang_ci = compute_small_lang_bootstrap(single_gpt, single_gpt, n_resamples=n_bootstrap)
     print_small_lang_ci("Hindi/Telugu held-out generalization:", small_lang_ci)
 
 
@@ -756,7 +756,7 @@ def evaluate_system_e(joint_preds, n_bootstrap=10000):
     stability = compute_stability(joint_f1)
     print_stability_table("Stability metrics (in-distribution languages):", stability)
 
-    small_lang_ci = compute_small_lang_bootstrap(joint_preds, n_resamples=n_bootstrap)
+    small_lang_ci = compute_small_lang_bootstrap(joint_preds, joint_preds, n_resamples=n_bootstrap)
     print_small_lang_ci("Hindi/Telugu held-out generalization:", small_lang_ci)
 
 
