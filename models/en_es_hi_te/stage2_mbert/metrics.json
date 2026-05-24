@@ -1,0 +1,23 @@
+{
+  "best_dev_overlap_f1": 0.8627066010385472,
+  "best_epoch": 6,
+  "test_exact_match": 0.6290491118077325,
+  "test_overlap_f1": 0.8242807728628215,
+  "model": "bert-base-multilingual-cased",
+  "langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu"
+  ],
+  "test_langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu",
+    "Indonesian"
+  ],
+  "train_size": 5082,
+  "dev_size": 631,
+  "test_size": 957
+}

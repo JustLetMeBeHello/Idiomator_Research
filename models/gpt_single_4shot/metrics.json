@@ -1,0 +1,42 @@
+{
+  "model": "gpt-4o",
+  "approach": "single_stage_4shot",
+  "n_shot": 4,
+  "seed": 42,
+  "test_size": 960,
+  "classification_macro_f1": 0.6662,
+  "span_exact_match": 0.4958,
+  "span_overlap_f1": 0.658,
+  "cls_per_lang": {
+    "English": 0.7069,
+    "Hindi": 0.5571,
+    "Indonesian": 0.6696,
+    "Spanish": 0.676,
+    "Telugu": 0.48
+  },
+  "span_per_lang": {
+    "English": {
+      "exact": 0.4567,
+      "overlap": 0.6184
+    },
+    "Hindi": {
+      "exact": 0.5645,
+      "overlap": 0.6992
+    },
+    "Indonesian": {
+      "exact": 0.5274,
+      "overlap": 0.6939
+    },
+    "Spanish": {
+      "exact": 0.4528,
+      "overlap": 0.635
+    },
+    "Telugu": {
+      "exact": 0.5968,
+      "overlap": 0.6826
+    }
+  },
+  "parse_failures": 0,
+  "spans_not_found": 0,
+  "cost_estimate": 0.0
+}

@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "annotation-tool",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "5500"],
+      "cwd": "/Users/shishirmaddineni/Desktop/Idiomator_Research/Research_And_Training/Annotation_tool",
+      "port": 5500
+    }
+  ]
+}

@@ -28,6 +28,9 @@ Fixes vs previous version:
   - Bootstrap 95% CIs added for all metrics on Indonesian test examples.
   - Indonesian results are clearly separated from in-distribution evaluation
     throughout all summary tables.
+  - B4/C4 (GPT-4o 4-shot pipeline and single-stage) added as new systems;
+    evaluated identically to B/C but reading pred_label key instead of
+    pred_idiomaticity (the field name written by the 4-shot scripts).
 
 Usage:
     python Full_evaluation.py
@@ -68,19 +71,26 @@ IN_DIST_LANGS = ["English", "Spanish", "Hindi", "Telugu"]
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument('--stage1_mbert', default='models/stage1_mbert_en_hi_te/test_predictions.jsonl')
-    p.add_argument('--stage2_mbert', default='models/stage2_mbert_en_hi_te/test_predictions.jsonl')
+    p.add_argument('--stage1_mbert', default='models/en_es_hi_te/stage1_mbert/test_predictions.jsonl')
+    p.add_argument('--stage2_mbert', default='models/en_es_hi_te/stage2_mbert/test_predictions.jsonl')
     p.add_argument('--stage1_gpt',   default='models/gpt_baseline_stage1/test_predictions.jsonl')
     p.add_argument('--stage2_gpt',   default='models/gpt_baseline_stage2/test_predictions.jsonl')
     p.add_argument('--single_gpt',   default='models/gpt_single_stage/test_predictions.jsonl')
-    p.add_argument('--joint_preds',  default='models/joint_mbert_en_hi_te/test_predictions.jsonl')
-    p.add_argument('--span2_joint',  default='models/stage2_mbert_shared/test_predictions.jsonl')
-    p.add_argument('--seq_phase1',   default='models/sequential/phase1/test_predictions.jsonl')
-    p.add_argument('--seq_phase2',   default='models/sequential/phase2/test_predictions.jsonl')
-    p.add_argument('--bio_preds',    default='models/bio_tagger_en_hi_te/test_predictions.jsonl')
+    p.add_argument('--joint_preds',  default='models/en_es_hi_te/joint_mbert/test_predictions.jsonl')
+    p.add_argument('--span2_joint',  default='models/en_es_hi_te/joint_mbert/test_predictions.jsonl')
+    p.add_argument('--seq_phase1',   default='models/en_es_hi_te/sequential_mbert/phase1/test_predictions.jsonl')
+    p.add_argument('--seq_phase2',   default='models/en_es_hi_te/sequential_mbert/phase2/test_predictions.jsonl')
+    p.add_argument('--bio_preds',    default='models/en_es_hi_te/bio_tagger/test_predictions.jsonl')
     p.add_argument('--output_dir',   default='results/pipeline_eval')
     p.add_argument('--n_bootstrap',  type=int, default=10000,
                    help='Number of bootstrap resamples for Indonesian CIs')
+    # ── 4-shot GPT baselines (B4 / C4) ───────────────────────────────────────
+    p.add_argument('--stage1_gpt4shot',  default='models/gpt_stage1_4shot/test_predictions.jsonl',
+                   help='Stage 1 4-shot GPT predictions (pred_label key)')
+    p.add_argument('--stage2_gpt4shot',  default='models/gpt_stage2_4shot/test_predictions.jsonl',
+                   help='Stage 2 4-shot GPT predictions (pred_span_start/end keys)')
+    p.add_argument('--single_gpt4shot', default='models/gpt_single_4shot/test_predictions.jsonl',
+                   help='Single-stage 4-shot GPT predictions (pred_label key)')
     return p.parse_args()
 
 
@@ -391,15 +401,21 @@ def bootstrap_ci(values, statistic_fn=np.mean, n_resamples=10000, ci=0.95, seed=
 
 def compute_small_lang_bootstrap(s1_preds, s2_preds,
                                  pred_label_key='pred_idiomaticity',
-                                 n_resamples=10000):
+                                 n_resamples=10000,
+                                 lang_filter=None):
     """
-    Compute per-example joint correctness for Hindi and Telugu examples only,
+    Compute per-example joint correctness for small-language examples,
     then bootstrap CI over those values.
+
+    lang_filter: if None, pools all SMALL_LANGS together (legacy behaviour).
+                 Pass a single language string (e.g. 'Hindi') to restrict to
+                 that language only — use this for per-language CIs.
 
     Returns dict with:
       cls_f1, span_exact, span_overlap, joint_f1 — each with (point, lo, hi)
     """
-    small_lang_records = [r for r in s1_preds.values() if r['language'] in SMALL_LANGS]
+    langs = [lang_filter] if lang_filter else SMALL_LANGS
+    small_lang_records = [r for r in s1_preds.values() if r['language'] in langs]
     if not small_lang_records:
         return None
 
@@ -504,8 +520,10 @@ def evaluate_system_a(s1_mbert, s2_mbert, n_bootstrap=10000):
     stability = compute_stability(joint_f1)
     print_stability_table("Stability metrics (in-distribution languages):", stability)
 
+    for lang in SMALL_LANGS:
+        ci = compute_small_lang_bootstrap(s1_mbert, s2_mbert, n_resamples=n_bootstrap, lang_filter=lang)
+        print_small_lang_ci(f"{lang} held-out generalization:", ci)
     small_lang_ci = compute_small_lang_bootstrap(s1_mbert, s2_mbert, n_resamples=n_bootstrap)
-    print_small_lang_ci("Hindi/Telugu held-out generalization:", small_lang_ci)
 
 
     return {
@@ -560,8 +578,10 @@ def evaluate_system_b(s1_gpt, s2_gpt, n_bootstrap=10000):
     stability = compute_stability(joint_f1)
     print_stability_table("Stability metrics (in-distribution languages):", stability)
 
+    for lang in SMALL_LANGS:
+        ci = compute_small_lang_bootstrap(s1_gpt, s2_gpt, n_resamples=n_bootstrap, lang_filter=lang)
+        print_small_lang_ci(f"{lang} held-out generalization:", ci)
     small_lang_ci = compute_small_lang_bootstrap(s1_gpt, s2_gpt, n_resamples=n_bootstrap)
-    print_small_lang_ci("Hindi/Telugu held-out generalization:", small_lang_ci)
 
 
     return {
@@ -628,8 +648,10 @@ def evaluate_system_c(single_gpt, n_bootstrap=10000):
     stability = compute_stability(joint_f1)
     print_stability_table("Stability metrics (in-distribution languages):", stability)
 
+    for lang in SMALL_LANGS:
+        ci = compute_small_lang_bootstrap(single_gpt, single_gpt, n_resamples=n_bootstrap, lang_filter=lang)
+        print_small_lang_ci(f"{lang} held-out generalization:", ci)
     small_lang_ci = compute_small_lang_bootstrap(single_gpt, single_gpt, n_resamples=n_bootstrap)
-    print_small_lang_ci("Hindi/Telugu held-out generalization:", small_lang_ci)
 
 
     return {
@@ -684,8 +706,10 @@ def evaluate_system_d(s1_mbert, span2_joint, n_bootstrap=10000):
     stability = compute_stability(joint_f1)
     print_stability_table("Stability metrics (in-distribution languages):", stability)
 
+    for lang in SMALL_LANGS:
+        ci = compute_small_lang_bootstrap(s1_mbert, span2_joint, n_resamples=n_bootstrap, lang_filter=lang)
+        print_small_lang_ci(f"{lang} held-out generalization:", ci)
     small_lang_ci = compute_small_lang_bootstrap(s1_mbert, span2_joint, n_resamples=n_bootstrap)
-    print_small_lang_ci("Hindi/Telugu held-out generalization:", small_lang_ci)
 
 
     return {
@@ -755,8 +779,10 @@ def evaluate_system_e(joint_preds, n_bootstrap=10000):
     stability = compute_stability(joint_f1)
     print_stability_table("Stability metrics (in-distribution languages):", stability)
 
+    for lang in SMALL_LANGS:
+        ci = compute_small_lang_bootstrap(joint_preds, joint_preds, n_resamples=n_bootstrap, lang_filter=lang)
+        print_small_lang_ci(f"{lang} held-out generalization:", ci)
     small_lang_ci = compute_small_lang_bootstrap(joint_preds, joint_preds, n_resamples=n_bootstrap)
-    print_small_lang_ci("Hindi/Telugu held-out generalization:", small_lang_ci)
 
 
     return {
@@ -818,8 +844,10 @@ def evaluate_system_f(seq_phase1, seq_phase2, n_bootstrap=10000):
     stability = compute_stability(joint_f1)
     print_stability_table("Stability metrics (in-distribution languages):", stability)
 
+    for lang in SMALL_LANGS:
+        ci = compute_small_lang_bootstrap(seq_phase1, seq_phase2, n_resamples=n_bootstrap, lang_filter=lang)
+        print_small_lang_ci(f"{lang} held-out generalization:", ci)
     small_lang_ci = compute_small_lang_bootstrap(seq_phase1, seq_phase2, n_resamples=n_bootstrap)
-    print_small_lang_ci("Hindi/Telugu held-out generalization:", small_lang_ci)
 
 
     return {
@@ -950,16 +978,165 @@ def evaluate_system_g(bio_preds, n_bootstrap=10000):
     }
 
 
+# ── System B4: GPT-4o 4-shot Stage 1 → GPT-4o 4-shot Stage 2 ────────────────
+
+def evaluate_system_b4(s1_gpt4, s2_gpt4, n_bootstrap=10000):
+    """
+    System B4: GPT-4o two-stage pipeline with 4 in-language few-shot exemplars.
+    Identical evaluation logic to System B, but the Stage 1 file writes
+    'pred_label' instead of 'pred_idiomaticity' — so every function call that
+    accepts a pred_label_key/pred_key argument must pass 'pred_label'.
+    build_pipeline_records already falls back to pred_label automatically.
+    """
+    print("\n" + "="*60)
+    print("System B4: GPT-4o 4-shot Stage 1 → GPT-4o 4-shot Stage 2")
+    print("="*60)
+
+    if not s1_gpt4 or not s2_gpt4:
+        print("  ✗ Missing prediction files")
+        return None
+
+    PRED_KEY = 'pred_label'
+
+    cls_results = cls_f1_per_lang(list(s1_gpt4.values()), pred_key=PRED_KEY)
+    print_cls_table("Stage 1 Classification:", cls_results)
+
+    exact_ub, overlap_ub = span_f1_per_lang(list(s2_gpt4.values()))
+    print_span_table("Stage 2 Span (standalone):", exact_ub, overlap_ub)
+
+    pipeline_records = build_pipeline_records(s1_gpt4, s2_gpt4, only_correct_cls=False)
+    exact_e2e, overlap_e2e = span_f1_per_lang(pipeline_records)
+    print_span_table("Full Pipeline Span (end-to-end):", exact_e2e, overlap_e2e)
+
+    correct_records = build_pipeline_records(s1_gpt4, s2_gpt4, only_correct_cls=True)
+    exact_corr, overlap_corr = span_f1_per_lang(correct_records)
+    print_span_table("Span F1 (Correct Stage 1 Identifications Only):", exact_corr, overlap_corr)
+
+    joint_acc, n_correct, n_total = compute_joint_acc(s1_gpt4, s2_gpt4, pred_label_key=PRED_KEY)
+    print(f"\n  Joint accuracy (cls + span both correct): {joint_acc:.4f} ({n_correct}/{n_total})")
+
+    joint_f1 = compute_joint_f1(s1_gpt4, s2_gpt4, pred_label_key=PRED_KEY)
+    print(f"\n  Joint F1 breakdown:")
+    for lang, d in joint_f1.items():
+        if isinstance(d, dict):
+            suffix = f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else ""
+            print(f"    {lang:<10} macro={d['macro_f1']:.4f}{suffix}  "
+                  f"literal: P={d['literal']['P']:.4f} R={d['literal']['R']:.4f} F1={d['literal']['F1']:.4f}  "
+                  f"idiomatic: P={d['idiomatic']['P']:.4f} R={d['idiomatic']['R']:.4f} F1={d['idiomatic']['F1']:.4f}")
+
+    stability = compute_stability(joint_f1)
+    print_stability_table("Stability metrics (in-distribution languages):", stability)
+
+    for lang in SMALL_LANGS:
+        ci = compute_small_lang_bootstrap(s1_gpt4, s2_gpt4, pred_label_key=PRED_KEY,
+                                          n_resamples=n_bootstrap, lang_filter=lang)
+        print_small_lang_ci(f"{lang} held-out generalization:", ci)
+    small_lang_ci = compute_small_lang_bootstrap(s1_gpt4, s2_gpt4, pred_label_key=PRED_KEY,
+                                                 n_resamples=n_bootstrap)
+
+    return {
+        'cls_f1':          cls_results,
+        'span_standalone': {'exact': exact_ub,   'overlap': overlap_ub},
+        'span_e2e':        {'exact': exact_e2e,  'overlap': overlap_e2e},
+        'span_correct_id': {'exact': exact_corr, 'overlap': overlap_corr},
+        'joint_acc':       round(joint_acc, 4),
+        'joint_f1':        joint_f1,
+        'stability':       stability,
+        'small_lang_ci':   small_lang_ci,
+    }
+
+
+# ── System C4: GPT-4o 4-shot Single-Stage ────────────────────────────────────
+
+def evaluate_system_c4(single_gpt4, n_bootstrap=10000):
+    """
+    System C4: GPT-4o single-stage with 4 in-language few-shot exemplars.
+    Identical evaluation logic to System C — both use pred_label as the
+    classification key and store pred_span_start/end in the same file.
+    """
+    print("\n" + "="*60)
+    print("System C4: GPT-4o 4-shot Single-Stage")
+    print("="*60)
+
+    if not single_gpt4:
+        print("  ✗ Missing prediction files")
+        return None
+
+    # Reuse System C evaluation logic exactly — pred_label key is the same
+    records = list(single_gpt4.values())
+
+    cls_results = cls_f1_per_lang(records, pred_key='pred_label')
+    print_cls_table("Classification:", cls_results)
+
+    idiomatic_records = [r for r in records if r['idiomaticity'] == 'idiomatic']
+    exact_idio, overlap_idio = span_f1_per_lang(idiomatic_records)
+    print_span_table("Span Extraction (Idiomatic Only):", exact_idio, overlap_idio)
+
+    e2e_records = []
+    for r in idiomatic_records:
+        cls_correct = r.get('pred_label') == r.get('idiomaticity')
+        e2e_records.append({
+            **r,
+            'pred_span_start': r.get('pred_span_start') if cls_correct else None,
+            'pred_span_end':   r.get('pred_span_end')   if cls_correct else None,
+        })
+    exact_e2e, overlap_e2e = span_f1_per_lang(e2e_records)
+    print_span_table("Span F1 (E2E — cls errors zeroed):", exact_e2e, overlap_e2e)
+
+    correct_records = [r for r in idiomatic_records if r.get('pred_label') == 'idiomatic']
+    exact_corr, overlap_corr = span_f1_per_lang(correct_records)
+    print_span_table("Span F1 (Correct Identifications Only):", exact_corr, overlap_corr)
+
+    joint_acc, n_correct, n_total = compute_joint_acc(
+        single_gpt4, single_gpt4, pred_label_key='pred_label')
+    print(f"\n  Joint accuracy (cls + span both correct): {joint_acc:.4f} ({n_correct}/{n_total})")
+
+    joint_f1 = compute_joint_f1(single_gpt4, single_gpt4, pred_label_key='pred_label')
+    print(f"\n  Joint F1 breakdown:")
+    for lang, d in joint_f1.items():
+        if isinstance(d, dict):
+            suffix = f"  macro_avg={d['macro_avg_f1']:.4f}" if lang == 'Overall' and 'macro_avg_f1' in d else ""
+            print(f"    {lang:<10} macro={d['macro_f1']:.4f}{suffix}  "
+                  f"literal: P={d['literal']['P']:.4f} R={d['literal']['R']:.4f} F1={d['literal']['F1']:.4f}  "
+                  f"idiomatic: P={d['idiomatic']['P']:.4f} R={d['idiomatic']['R']:.4f} F1={d['idiomatic']['F1']:.4f}")
+
+    stability = compute_stability(joint_f1)
+    print_stability_table("Stability metrics (in-distribution languages):", stability)
+
+    for lang in SMALL_LANGS:
+        ci = compute_small_lang_bootstrap(single_gpt4, single_gpt4,
+                                          pred_label_key='pred_label',
+                                          n_resamples=n_bootstrap, lang_filter=lang)
+        print_small_lang_ci(f"{lang} held-out generalization:", ci)
+    small_lang_ci = compute_small_lang_bootstrap(single_gpt4, single_gpt4,
+                                                 pred_label_key='pred_label',
+                                                 n_resamples=n_bootstrap)
+
+    return {
+        'cls_f1':          cls_results,
+        'span_standalone': {'exact': exact_idio,  'overlap': overlap_idio},
+        'span_e2e':        {'exact': exact_e2e,   'overlap': overlap_e2e},
+        'span_correct_id': {'exact': exact_corr,  'overlap': overlap_corr},
+        'joint_acc':       round(joint_acc, 4),
+        'joint_f1':        joint_f1,
+        'stability':       stability,
+        'small_lang_ci':   small_lang_ci,
+    }
+
+
 # ── Summary table ─────────────────────────────────────────────────────────────
 
 def print_summary(results_a, results_b, results_c, results_d,
-                  results_e, results_f, results_g):
+                  results_e, results_f, results_g,
+                  results_b4=None, results_c4=None):
     LANGS = ['English', 'Spanish', 'Hindi', 'Telugu']
 
     systems = [
         ("A: mBERT Pipeline (S1→S2)",        results_a),
         ("B: GPT-4o Pipeline (S1→S2)",        results_b),
+        ("B4: GPT-4o 4-shot Pipeline",        results_b4),
         ("C: GPT-4o Single-Stage",            results_c),
+        ("C4: GPT-4o 4-shot Single-Stage",    results_c4),
         ("D: mBERT S1 → Joint Span Head",     results_d),
         ("E: Joint mBERT (one-pass)",         results_e),
         ("F: Sequential mBERT (Ph1→Ph2)",     results_f),
@@ -1091,7 +1268,7 @@ def print_summary(results_a, results_b, results_c, results_d,
 
     # ── Indonesian held-out results ───────────────────────────────────────────
     print(f"\n{'─'*108}")
-    print("Indonesian Held-Out Generalization — 95% Bootstrap CIs  (n≈33 test examples)")
+    print("Indonesian Held-Out Generalization — 95% Bootstrap CIs  (n=328 test examples)")
     print(f"  Indonesian is excluded from all training; results are zero-shot cross-lingual transfer.")
     print(f"{'─'*108}")
     ihdr = f"{'System':<45} {'Cls Acc':<22} {'Span Exact':<22} {'Span Overlap':<22} {'Joint F1':<22}"
@@ -1132,6 +1309,10 @@ def main():
     seq_phase1  = load_preds(args.seq_phase1)
     seq_phase2  = load_preds(args.seq_phase2)
     bio_preds   = load_preds(args.bio_preds)
+    # 4-shot systems
+    s1_gpt4     = load_preds(args.stage1_gpt4shot)
+    s2_gpt4     = load_preds(args.stage2_gpt4shot)
+    single_gpt4 = load_preds(args.single_gpt4shot)
 
     print(f"  Stage 1 mBERT    : {len(s1_mbert)} predictions")
     print(f"  Stage 2 mBERT    : {len(s2_mbert)} predictions")
@@ -1143,11 +1324,17 @@ def main():
     print(f"  Sequential Ph1   : {len(seq_phase1)} predictions")
     print(f"  Sequential Ph2   : {len(seq_phase2)} predictions")
     print(f"  BIO Tagger       : {len(bio_preds)} predictions")
+    print(f"  Stage 1 GPT 4-shot : {len(s1_gpt4)} predictions")
+    print(f"  Stage 2 GPT 4-shot : {len(s2_gpt4)} predictions")
+    print(f"  Single GPT 4-shot  : {len(single_gpt4)} predictions")
     print(f"  Bootstrap resamples: {args.n_bootstrap}")
 
-    all_keys = [set(d) for d in [s1_mbert, s2_mbert, s1_gpt, s2_gpt,
-                                  single_gpt, joint_preds, span2_joint,
-                                  seq_phase1, seq_phase2, bio_preds] if d]
+    # Build common set from all non-empty prediction dicts
+    all_dicts = [d for d in [s1_mbert, s2_mbert, s1_gpt, s2_gpt,
+                              single_gpt, joint_preds, span2_joint,
+                              seq_phase1, seq_phase2, bio_preds,
+                              s1_gpt4, s2_gpt4, single_gpt4] if d]
+    all_keys = [set(d) for d in all_dicts]
     common   = set.intersection(*all_keys) if all_keys else set()
     print(f"\n  Common sentences across all systems: {len(common)}")
     print(f"  Filtering to common set for fair comparison...")
@@ -1163,25 +1350,33 @@ def main():
     seq_phase1  = filt(seq_phase1)
     seq_phase2  = filt(seq_phase2)
     bio_preds   = filt(bio_preds)
+    s1_gpt4     = filt(s1_gpt4)
+    s2_gpt4     = filt(s2_gpt4)
+    single_gpt4 = filt(single_gpt4)
 
     print(f"  After filtering: {len(s1_mbert)} examples per system\n")
 
     nb = args.n_bootstrap
-    results_a = evaluate_system_a(s1_mbert, s2_mbert, n_bootstrap=nb)
-    results_b = evaluate_system_b(s1_gpt, s2_gpt, n_bootstrap=nb)
-    results_c = evaluate_system_c(single_gpt, n_bootstrap=nb)
-    results_d = evaluate_system_d(s1_mbert, span2_joint, n_bootstrap=nb)
-    results_e = evaluate_system_e(joint_preds, n_bootstrap=nb)
-    results_f = evaluate_system_f(seq_phase1, seq_phase2, n_bootstrap=nb)
-    results_g = evaluate_system_g(bio_preds, n_bootstrap=nb)
+    results_a  = evaluate_system_a(s1_mbert, s2_mbert, n_bootstrap=nb)
+    results_b  = evaluate_system_b(s1_gpt, s2_gpt, n_bootstrap=nb)
+    results_c  = evaluate_system_c(single_gpt, n_bootstrap=nb)
+    results_d  = evaluate_system_d(s1_mbert, span2_joint, n_bootstrap=nb)
+    results_e  = evaluate_system_e(joint_preds, n_bootstrap=nb)
+    results_f  = evaluate_system_f(seq_phase1, seq_phase2, n_bootstrap=nb)
+    results_g  = evaluate_system_g(bio_preds, n_bootstrap=nb)
+    results_b4 = evaluate_system_b4(s1_gpt4, s2_gpt4, n_bootstrap=nb)
+    results_c4 = evaluate_system_c4(single_gpt4, n_bootstrap=nb)
 
     print_summary(results_a, results_b, results_c, results_d,
-                  results_e, results_f, results_g)
+                  results_e, results_f, results_g,
+                  results_b4=results_b4, results_c4=results_c4)
 
     all_results = {
         'system_a_mbert_pipeline':        results_a,
         'system_b_gpt_pipeline':          results_b,
+        'system_b4_gpt_pipeline_4shot':   results_b4,
         'system_c_gpt_single':            results_c,
+        'system_c4_gpt_single_4shot':     results_c4,
         'system_d_mbert_s1_joint_span':   results_d,
         'system_e_joint_end_to_end':      results_e,
         'system_f_sequential_phase1_ph2': results_f,

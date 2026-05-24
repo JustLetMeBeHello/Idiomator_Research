@@ -1,0 +1,17 @@
+{
+  "model": "gpt-4o",
+  "approach": "stage1_4shot",
+  "n_shot": 4,
+  "seed": 42,
+  "test_size": 960,
+  "test_macro_f1": 0.7268,
+  "cls_per_lang": {
+    "English": 0.8007,
+    "Hindi": 0.6544,
+    "Indonesian": 0.6874,
+    "Spanish": 0.7434,
+    "Telugu": 0.6039
+  },
+  "parse_failures": 0,
+  "cost_estimate": 0.48
+}

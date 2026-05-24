@@ -1,7 +1,7 @@
 {
   "model_name": "bert-base-multilingual-cased",
-  "data_dir": "idioms_structured/Splits",
-  "output_dir": "models/language_ablation_matrix/en_es_hi_te/stage1_mbert",
+  "data_dir": "/content/Research_And_Training/idioms_structured/Splits",
+  "output_dir": "/content/models/language_ablation_matrix/en_es_hi_te/stage2_mbert",
   "langs": [
     "English",
     "Spanish",
@@ -17,7 +17,7 @@
   ],
   "epochs": 7,
   "batch_size": 32,
-  "lr": 3e-05,
+  "lr": 1e-05,
   "max_len": 128,
   "warmup_ratio": 0.1,
   "seed": 42,

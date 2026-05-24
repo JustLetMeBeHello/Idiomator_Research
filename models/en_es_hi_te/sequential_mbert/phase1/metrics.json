@@ -1,0 +1,18 @@
+{
+  "phase": 1,
+  "save_criterion": "cls_f1",
+  "p1_cls_weight": 0.7,
+  "p1_span_weight": 0.3,
+  "best_dev_cls_f1": 0.8144607381158819,
+  "best_epoch": 4,
+  "test_cls_macro_f1": 0.7732457773415022,
+  "test_span_exact": 0.5893416927899686,
+  "test_span_overlap": 0.8104732860160416,
+  "model": "bert-base-multilingual-cased",
+  "langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu"
+  ]
+}
