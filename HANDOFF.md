@@ -1,3 +1,66 @@
+# Handoff — 2026-05-25 — Council venue deliberation + rigor experiments setup (preprint-first)
+
+## TL;DR
+User ran `/council` on the two paper drafts (MultiIdiom + IdiomBERT) for venue/combine strategy. Council converged: **SPLIT the papers (unanimous), target NAACL 2027 via August 2026 ARR**, Findings is the realistic ceiling with current scope, Main is conditional on adding XLM-R replication + MuRIL/IndoBERT + Llama-3 baselines + a BIO+MuRIL Telugu recovery experiment. Created `Additional_Rigor_Experiments/` with 7 files (4 experiments + HP sweep + Colab notebook + README) implementing the council's load-bearing fixes. **User is now optimizing for a preprint** (not venue submission first) — anonymization constraints relax, GitHub URL stays in, companion citations can be de-anonymized via arXiv IDs.
+
+## Code state
+- Repo: `/Users/shishirmaddineni/Desktop/Idiomator_Research/Research_And_Training`, branch: `main`, up to date with `origin/main`
+- Uncommitted changes: **YES** — `Additional_Rigor_Experiments/` is entirely untracked; some pre-existing annotation-tool diffs from prior sessions also unstaged
+- Files created this session (all under `Additional_Rigor_Experiments/`):
+  - [`README.md`](Research_And_Training/Additional_Rigor_Experiments/README.md) — overview, run order, hyperparameter rationale, Colab quickstart
+  - [`run_01_bio_muril_recovery.sh`](Research_And_Training/Additional_Rigor_Experiments/run_01_bio_muril_recovery.sh) — System G (BIO) + `google/muril-base-cased` on full training. **Decision-influencing — run FIRST.**
+  - [`run_02_xlmr_qa_vs_bio.sh`](Research_And_Training/Additional_Rigor_Experiments/run_02_xlmr_qa_vs_bio.sh) — System E + System G with `xlm-roberta-base` (lr=1e-5 for joint, sequential trainings)
+  - [`run_03_muril_joint.sh`](Research_And_Training/Additional_Rigor_Experiments/run_03_muril_joint.sh) — System E + MuRIL on full training
+  - [`run_04_llama3_baseline.py`](Research_And_Training/Additional_Rigor_Experiments/run_04_llama3_baseline.py) — Llama-3.3-70B single-stage. Provider registry for Together/DeepInfra/Groq/OpenRouter/local-vLLM. Output format matches `Ablations/GPT-Baseline.py` exactly so it plugs into `Evaluation/Full_evaluation.py` unchanged.
+  - [`hp_sweep_xlmr_dev.sh`](Research_And_Training/Additional_Rigor_Experiments/hp_sweep_xlmr_dev.sh) — optional safety valve: 3-point LR sweep {5e-6, 1e-5, 2e-5} on dev only for XLM-R Joint. Do not run by default.
+  - [`Run_In_Colab.ipynb`](Research_And_Training/Additional_Rigor_Experiments/Run_In_Colab.ipynb) — Colab notebook with Drive symlink, API-key loader, `RUN = '01'/'02'/'03'/'04'/'all'` selector, multi-session + multi-account fan-out instructions
+- Auto-memory updated: `project_idiomator_research.md` created in `~/.claude/projects/-Users-shishirmaddineni-Desktop-Personal-Language-Automation/memory/`, MEMORY.md index updated
+- Build/test status: **none of the experiment scripts have been run yet.** Code is reviewed against existing trainers but not executed. Recommend a `--dry_run`-style 10-example smoke test on experiment 01 before committing to a full A100 hour.
+
+## Decisions made
+- **Split the two papers** (do not combine) — Why: Council unanimous (4/4 panelists). Combining forces 8-page cuts that gut either the 15-combo ablation or the IAA/validation methodology; concentrates reviewer-attack surface (silver-data + small-n CIs apply to both, but isolable when separate); MWE field convention (PARSEME, ID10M, AStitchInLanguageModels) is split.
+- **Target August 2026 ARR → NAACL 2027 (May 2027 venue)** — Why: User stated August ARR cycle. EACL 2027 (Aug 27, 2026 commit) is unreachable from August ARR — reviews not ready in time. EMNLP 2026 commit (~Sep) also unreachable. NAACL 2027 commit window (~Nov-Dec 2026) is the natural fit. **NOTE: User pivoted mid-session to preprint-first** — venue submission becomes secondary.
+- **Optimize for preprint (arXiv) before venue** — Why: User stated this in `/handoff` args. Implications: (a) GitHub URL in IdiomBERT Sec 9 does NOT need anonymizing for the preprint; (b) "Anonymous, 2026" companion-paper citations can be replaced with arXiv IDs once both are posted; (c) arXiv has no page limit so all 15-combo ablation cells + appendices can stay in; (d) anonymized version still needed later for ARR August commit.
+- **Use published per-encoder learning rates, do NOT re-tune per encoder** — Why: Main paper Sec 7 already fixes hyperparameters across 15 combos to "isolate training data composition." Same logic applies to encoder swaps — per-encoder tuning would confound encoder choice with HP search. XLM-R gets 1e-5 (Conneau et al. 2020 default), MuRIL gets 2e-5 (Khanuja et al. 2021 default, same family as mBERT). Safety valve: `hp_sweep_xlmr_dev.sh` if a reviewer specifically pushes back.
+- **Run BIO+MuRIL recovery first** — Why: Decision-influencing. If Telugu BIO recovers with MuRIL tokenizer → MultiIdiom gains a Main-worthy "cross-lingual tokenizer recipe" story and IdiomBERT's "QA-style is necessary" claim weakens. If still 0.000 → IdiomBERT's architectural claim hardens. Single experiment flips which paper has the Main shot.
+- **Llama-3.3-70B as second LLM baseline (not just GPT-4o)** — Why: Council + dev-scan agree single-LLM comparison is auto-reject signal at Main venues in 2026. Open-weights second LLM defuses the cherry-pick critique.
+
+## Rejected approaches
+- **Combine the two papers into one** — Why not: 4/4 panelists rejected. Page budget would force cutting either the 15-combo ablation (IdiomBERT's distinct contribution) or the IAA/validation infrastructure (MultiIdiom's distinct contribution).
+- **TACL combined submission** — Why not: 9-15 month R&R timeline misses every reasonable 2026 venue; by EMNLP 2027 the LLM baselines would be stale; council assessed acceptance probability <20%.
+- **LREC-COLING 2026 for MultiIdiom** — Why not: Submission deadlines closed Oct 2025; next LREC is 2028 (biennial).
+- **NAACL/EACL 2026** — Why not: Commitment windows close before mid-June; both venues already happened or finalized for this cycle.
+- **EMNLP 2026 via June ARR** — Why not (now): Was viable from June ARR but user chose August ARR, which can't reach EMNLP 2026 commit.
+- **Per-encoder full hyperparameter sweep** — Why not: Confounds encoder swap with HP search; multiplies time budget 4×; contradicts main paper's "fixed HP" protocol.
+- **15-combination ablation re-run for new encoders** — Why not: The ablation matrix defends "how training composition affects mBERT" — a different question from "does the QA-vs-BIO finding survive encoder swap?" New encoders only need full-training cells to defend the new claims.
+- **IndoBERT for Indonesian as 4th rigor experiment** — Why not: IndoBERT is monolingual Indonesian; cannot replace mBERT in EN+ES+HI+TE training; clean experimental design unclear. Skipped unless a reviewer asks.
+
+## Open questions
+- **BIO+MuRIL outcome (experiment 01) — undetermined.** This single result flips paper framing. Run it FIRST and revisit narrative before writing.
+- **Llama-3.3-70B provider choice** — Together AI ($15-30 budget, paid) vs Groq (free tier, rate-limited but enough for 956+328 calls) vs DeepInfra. Notebook supports all four via `--provider` flag; user hasn't picked yet.
+- **Multi-account fan-out vs solo Pro+** — User asked about both. If solo: Colab Pro+ ($50/mo, A100) → sequential `RUN='all'` in ~3.5 hr. If fan-out: 3-4 collaborators with free T4s, shared Drive folder, ~same wall-clock. User hasn't decided.
+- **Preprint version: anonymize or not?** Standard arXiv is de-anonymized. ARR submission later will need an anonymized version. Recommend maintaining two branches/versions OR just the de-anon preprint now and re-anonymize before Aug ARR.
+- **IAA / error analysis** — User confirmed they're personally doing TE + EN + HI validation with 2 annotators each and error-analysis tables ~mid-June. Not in the rigor-experiments scope; tracked separately.
+- **Whether `Train_Join.py` works cleanly with XLM-R/MuRIL out of the box** — Both encoders use SentencePiece (different tokenizer offset behavior than WordPiece). Code looks tokenizer-agnostic via AutoTokenizer/AutoModel, but the character-offset → token-position mapping in the span head may need verification. Watch the first ~50 training steps for offset-mapping warnings.
+- **Citations to add to both papers' Related Work** — MuRIL (Khanuja et al. 2021), XLM-R (Conneau et al. 2020), IndoBERT (Wilie et al. 2020), IndicBERT (Kakwani et al. 2020), Lin et al. 2019 "Choosing Transfer Languages," Constant et al. 2017 MWE survey. Currently uncited.
+- **Synthetic data quality audit** — Council recommended sampling 200 training examples per language for a native-speaker correctness rating, adding as MultiIdiom Sec 5 subsection. Not yet started.
+
+## Next steps
+1. **Run experiment 01 (BIO + MuRIL) FIRST in Colab to get the decision-influencing result.** Open `Additional_Rigor_Experiments/Run_In_Colab.ipynb` in Colab → A100 runtime → `RUN = '01'` → run all. ~45 min on A100. Compare TE exact match to System G mBERT baseline (0.0000) to determine paper framing.
+2. **Pick Llama-3 provider** (Together AI for stability, Groq for free) and set the corresponding API key in Colab Secrets. The notebook reads `TOGETHER_API_KEY` / `GROQ_API_KEY` / `DEEPINFRA_API_KEY` automatically.
+3. **Decide fan-out plan**: solo Pro+ or recruit 3-4 collaborators. If fan-out: create shared Drive folder `IdiomatorRigor/` with the `claims.md` template (template in the notebook's multi-account section).
+4. **After experiment 01 lands, run 02 + 03 + 04 in parallel** (different Colab sessions / accounts).
+5. **Pull results to local repo**: `rsync -av ~/Google\ Drive/My\ Drive/IdiomatorRigor/ ~/Desktop/Idiomator_Research/Research_And_Training/models/` then `python Evaluation/Full_evaluation.py`. Add new System rows to IdiomBERT Tables 4, 6, 7 and MultiIdiom Table 3.
+6. **Reframe "stability is decisive discriminator"** in IdiomBERT Sec 7 to the council's wording: *"No fine-tuned mBERT system shows a statistically significant Joint F1 advantage at full training (within-cluster spread 0.013, smaller than HI/TE bootstrap CI widths from Table 7). We report stability scores as a complementary view rather than a decisive discriminator."*
+7. **Add missing citations** to both papers' Related Work (list under Open Questions).
+8. **For preprint**: keep GitHub URL in IdiomBERT Sec 9 as-is; replace "Anonymous, 2026" companion citations with the arXiv IDs once both are posted. Make a separate anonymized branch for the ARR August submission.
+9. **Optional**: ask current chat or future chat to create `05_contamination_check.py` (Wiktionary-vs-test-idiom overlap) and `06_seed_sweep_llama3_4shot.py` (addresses C4 single-draw concern). Council flagged both; neither blocks the preprint.
+
+## Pick-up prompt
+Continuing the IdiomBERT + MultiIdiom preprint preparation. Prior session ran `/council` on both paper drafts and converged on: SPLIT the papers, target NAACL 2027 via August 2026 ARR, but user is now optimizing for an arXiv preprint first (venue submission secondary). Created `Additional_Rigor_Experiments/` directory with 7 files implementing the council's load-bearing fixes (BIO+MuRIL Telugu recovery, XLM-R replication of QA-vs-BIO, MuRIL Joint, Llama-3.3-70B baseline, optional HP sweep, Colab notebook, README). **Nothing has been run yet.** Immediate next step: run experiment 01 (BIO + MuRIL Telugu recovery) in Colab — it's decision-influencing and determines which paper carries the Main story. Open `Research_And_Training/Additional_Rigor_Experiments/Run_In_Colab.ipynb` in Colab, set `RUN = '01'`, ~45 min on A100. Read `Research_And_Training/HANDOFF.md` (top-most section) for full context including council convergence reasoning, decisions/rejections, all open questions, and the rest of the experiment plan.
+
+---
+
 # Handoff — 2026-05-24 — Annotation tool: progress bug fix, Railway deploy, help panel, English language
 
 ## TL;DR

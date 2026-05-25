@@ -132,10 +132,16 @@ class Annotation(BaseModel):
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+def _annotation_file(language: str) -> Path:
+    """Prefer annotation_pool.jsonl (test + extras) if present; else fall back to test.jsonl."""
+    pool = DATA_DIR / language / "annotation_pool.jsonl"
+    return pool if pool.exists() else DATA_DIR / language / "test.jsonl"
+
+
 def _load_test(language: str) -> list[dict]:
-    path = DATA_DIR / language / "test.jsonl"
+    path = _annotation_file(language)
     if not path.exists():
-        raise HTTPException(404, f"No test data for language '{language}'")
+        raise HTTPException(404, f"No annotation data for language '{language}'")
     examples = []
     with open(path, encoding="utf-8") as f:
         for line in f:
@@ -195,10 +201,10 @@ def list_languages():
         for lang_dir in sorted(DATA_DIR.iterdir()):
             if not lang_dir.is_dir():
                 continue
-            test_file = lang_dir / "test.jsonl"
-            if not test_file.exists():
+            data_file = _annotation_file(lang_dir.name)
+            if not data_file.exists():
                 continue
-            count = sum(1 for line in open(test_file, encoding="utf-8") if line.strip())
+            count = sum(1 for line in open(data_file, encoding="utf-8") if line.strip())
             languages[lang_dir.name] = {"total": count}
 
     db = SessionLocal()

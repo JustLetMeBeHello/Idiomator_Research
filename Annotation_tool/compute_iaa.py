@@ -201,7 +201,7 @@ def print_latex_table(results_by_lang):
         print(r"\midrule")
     print(r"\bottomrule")
     print(r"\end{tabular}")
-    print(r"\caption{Inter-annotator agreement (Cohen's $\kappa$) for doubly-annotated Telugu test examples and English crosscheck subset, computed on two dimensions separately.}")
+    print(r"\caption{Inter-annotator agreement (Cohen's $\kappa$) and percent agreement on the doubly-annotated overlap subset for each language, computed separately for the idiomaticity label and the span boundary correctness judgment.}")
     print(r"\label{tab:iaa}")
     print(r"\end{table}")
 
