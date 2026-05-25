@@ -2,7 +2,8 @@
 IdiomBank Annotation API
 
 Endpoints:
-  GET  /                        health check
+  GET  /                        serve index.html (annotation UI)
+  GET  /api/health              health check
   GET  /test/languages          list available languages + example counts
   GET  /test/{language}         serve enriched test JSONL for a language
   GET  /annotations             list all annotators + progress
@@ -18,7 +19,7 @@ from collections import defaultdict
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 
 from sqlalchemy import (
@@ -36,9 +37,15 @@ DB_PATH  = HERE / "annotations.db"
 
 # ── Database ───────────────────────────────────────────────────────────────────
 
-DATABASE_URL = f"sqlite:///{DB_PATH}"
+# On Railway, DATABASE_URL env var is set automatically when a PostgreSQL addon
+# is attached.  Locally we fall back to SQLite.
+_raw_db_url  = os.environ.get("DATABASE_URL", f"sqlite:///{DB_PATH}")
+# Railway issues postgres:// URLs; SQLAlchemy 2.x requires postgresql://
+DATABASE_URL = _raw_db_url.replace("postgres://", "postgresql://", 1)
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+_is_sqlite   = DATABASE_URL.startswith("sqlite")
+_engine_kwargs = {"connect_args": {"check_same_thread": False}} if _is_sqlite else {}
+engine = create_engine(DATABASE_URL, **_engine_kwargs)
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
 
@@ -167,6 +174,15 @@ def _row_to_dict(r: AnnotationDB) -> dict:
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
 @app.get("/")
+def serve_ui():
+    """Serve the annotation UI (index.html)."""
+    html_path = HERE / "index.html"
+    if not html_path.exists():
+        raise HTTPException(404, "index.html not found")
+    return FileResponse(html_path, media_type="text/html")
+
+
+@app.get("/api/health")
 def root():
     return {"status": "running", "service": "IdiomBank Annotation API"}
 

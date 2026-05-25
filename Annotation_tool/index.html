@@ -522,6 +522,94 @@
     border-radius: 3px;
     padding: 2px 7px;
   }
+
+  /* ── Help button ── */
+  .btn-help {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .btn-help:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ── Help drawer ── */
+  .help-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 200;
+    display: none;
+  }
+  .help-overlay.open { display: block; }
+  .help-drawer {
+    position: fixed; top: 0; right: -480px; bottom: 0;
+    width: 460px; max-width: 95vw;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    z-index: 201;
+    overflow-y: auto;
+    transition: right 0.25s cubic-bezier(.4,0,.2,1);
+    padding: 28px 28px 48px;
+  }
+  .help-overlay.open .help-drawer { right: 0; }
+  .help-drawer h2 {
+    font-size: 15px; font-weight: 600; margin-bottom: 20px;
+    color: var(--accent);
+    font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: 0.04em;
+  }
+  .help-section {
+    margin-bottom: 24px;
+  }
+  .help-section h3 {
+    font-size: 12px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted);
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .help-section h3 .num {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--surface2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: var(--accent);
+  }
+  .help-section p {
+    font-size: 13px; line-height: 1.65; color: var(--text); margin-bottom: 10px;
+  }
+  .help-example {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 8px;
+    line-height: 1.6;
+  }
+  .help-example .tag-idio { color: var(--idiomatic); font-weight: 600; }
+  .help-example .tag-lit  { color: var(--literal);   font-weight: 600; }
+  .help-example .tag-ok   { color: var(--accent);    font-weight: 600; }
+  .help-example .tag-bad  { color: var(--danger);    font-weight: 600; }
+  .help-example .tag-warn { color: var(--warn);      font-weight: 600; }
+  .help-divider {
+    border: none; border-top: 1px solid var(--border); margin: 20px 0;
+  }
+  .help-close {
+    position: sticky; bottom: 0;
+    width: 100%; padding: 12px;
+    background: var(--surface); border-top: 1px solid var(--border);
+    margin: 0 -28px; width: calc(100% + 56px);
+    cursor: pointer;
+    font-size: 13px; font-weight: 500;
+    color: var(--muted); text-align: center;
+    letter-spacing: 0.03em;
+  }
+  .help-close:hover { color: var(--text); }
 </style>
 </head>
 <body>
@@ -536,6 +624,70 @@
   <div class="topbar-right">
     <div class="lang-badge" id="langBadge" style="display:none">—</div>
     <button class="btn-back-lang" id="btnChangeLang" style="display:none" onclick="goToLangSelect()">↩ Languages</button>
+    <button class="btn-help" onclick="openHelp()" title="Annotation guide">?</button>
+  </div>
+</div>
+
+<!-- ── Help drawer ── -->
+<div class="help-overlay" id="helpOverlay" onclick="closeHelp(event)">
+  <div class="help-drawer" id="helpDrawer">
+    <h2>ANNOTATION GUIDE</h2>
+
+    <div class="help-section">
+      <h3><span class="num">①</span> Idiomaticity Label</h3>
+      <p>Is the idiom in this sentence used <strong>figuratively</strong> (idiomatic) or <strong>literally</strong> (literal)? The label is pre-filled — your job is to confirm or correct it.</p>
+      <div class="help-example">
+        <span class="tag-idio">IDIOMATIC</span> &nbsp;"She <em>kicked the bucket</em> last night." → means she <em>died</em> (figurative).
+      </div>
+      <div class="help-example">
+        <span class="tag-lit">LITERAL</span> &nbsp;"He <em>kicked the bucket</em> across the yard." → physically kicked a bucket.
+      </div>
+      <p>If you disagree with the pre-filled label, click the other button. Your choice overrides it.</p>
+    </div>
+
+    <hr class="help-divider">
+
+    <div class="help-section">
+      <h3><span class="num">②</span> Span Annotation</h3>
+      <p>The <strong>highlighted words</strong> in the sentence should mark exactly the idiom expression — no more, no fewer words. Mark <span class="tag-ok">Correct</span> if the highlight is accurate, <span class="tag-bad">Wrong</span> if it is off.</p>
+      <div class="help-example">
+        <span class="tag-ok">✓ CORRECT</span> &nbsp;"She [<em>kicked the bucket</em>] last night." — span covers the full idiom.
+      </div>
+      <div class="help-example">
+        <span class="tag-bad">✗ WRONG</span> &nbsp;"She [<em>kicked the</em>] bucket last night." — span is too short.<br>
+        → Type the correct span text in the box that appears.
+      </div>
+      <p>When marking wrong, write the exact phrase that <em>should</em> be highlighted (copy it from the sentence).</p>
+    </div>
+
+    <hr class="help-divider">
+
+    <div class="help-section">
+      <h3><span class="num">③</span> Sense Context</h3>
+      <p>This question only appears when a <strong>sense definition</strong> is shown (the purple box). The dataset has multiple senses per idiom; you must check whether the sentence is using the <em>specific sense</em> described.</p>
+      <div class="help-example">
+        <span class="tag-ok">✓ Correct sense</span> — The sentence clearly uses the idiom in the meaning described in the definition.
+      </div>
+      <div class="help-example">
+        <span class="tag-warn">△ Uncertain</span> — The sentence is ambiguous; you can't tell which sense is intended. Add a note if helpful.
+      </div>
+      <div class="help-example">
+        <span class="tag-bad">✗ Wrong sense</span> — The sentence uses the idiom, but in a <em>different</em> sense than the definition. Add a note explaining what sense you think it is.
+      </div>
+    </div>
+
+    <hr class="help-divider">
+
+    <div class="help-section">
+      <h3>General tips</h3>
+      <p>• <strong>Go with your first instinct</strong> — don't overthink. If you're uncertain after 30 seconds, mark it Uncertain and add a note.</p>
+      <p>• <strong>You can go back</strong> — click <em>← Prev</em> to revisit and change any previous answer.</p>
+      <p>• <strong>Your progress is saved automatically</strong> — if you close the browser, reopen it and your name will be pre-filled. Click Continue and pick the same language to resume.</p>
+      <p>• <strong>Notes field</strong> — use the optional notes box at the bottom of each card for anything that doesn't fit the structured options.</p>
+      <p>• <strong>Export when done</strong> — on the completion screen, click <em>Export results.jsonl</em> and send that file to the researcher.</p>
+    </div>
+
+    <button class="help-close" onclick="closeHelp()">✕ &nbsp;Close guide</button>
   </div>
 </div>
 
@@ -701,7 +853,9 @@
 // State
 // ════════════════════════════════════════════════════════════════════════════
 
-const API       = 'http://localhost:8000';
+// Empty string = same origin (works on Railway).
+// Override with full URL only for local dev against a separate server.
+const API       = window.location.port === '5500' ? 'http://localhost:8000' : '';
 const STORE_KEY = 'idiombank_v2';
 
 let annotator     = '';
@@ -720,6 +874,7 @@ let selSense  = null;
 let exStartTime = null;
 
 const LANG_META = {
+  English:    { icon: '🇬🇧', label: 'English',    desc: 'Germanic' },
   Telugu:     { icon: '🇮🇳', label: 'Telugu',     desc: 'Dravidian' },
   Hindi:      { icon: '🇮🇳', label: 'Hindi',       desc: 'Indo-Aryan' },
   Spanish:    { icon: '🇪🇸', label: 'Spanish',     desc: 'Romance' },
@@ -1273,6 +1428,27 @@ function download(filename, content) {
   a.download = filename;
   a.click();
 }
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// Help drawer
+// ════════════════════════════════════════════════════════════════════════════
+
+function openHelp() {
+  document.getElementById('helpOverlay').classList.add('open');
+}
+
+function closeHelp(e) {
+  // Close if clicking the overlay backdrop (not the drawer itself) or the close button
+  if (!e || e.target === document.getElementById('helpOverlay') || e.currentTarget === document.querySelector('.help-close')) {
+    document.getElementById('helpOverlay').classList.remove('open');
+  }
+}
+
+// Close on Escape key
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('helpOverlay').classList.remove('open');
+});
 
 
 // ════════════════════════════════════════════════════════════════════════════
