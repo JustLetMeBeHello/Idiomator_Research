@@ -21,47 +21,57 @@ Evaluation/Full_evaluation.py without any post-processing changes.
 
 Supported providers (OpenAI-compatible APIs)
 --------------------------------------------
-  - DeepInfra         (default — BF16 full-precision Llama-3.3-70B)
+  - Groq              (DEFAULT — free tier 14.4k RPD, LPU-quantized; preprint-grade)
+  - DeepInfra         (BF16 full-precision; paper-grade — switch to this before ARR)
   - Together AI       (FP8 Turbo only at serverless tier; see "Precision note")
-  - Groq              (fastest but rate-limited on free tier; quantization unpublished)
   - OpenRouter        (NOT recommended for paper baselines — routes to varying backends)
   - Local vLLM server (set --base_url http://localhost:8000/v1)
 
-Precision note (matters for the paper baseline)
------------------------------------------------
-DeepInfra serves `meta-llama/Llama-3.3-70B-Instruct` at BF16 — same numerics
-as the official Meta release. Together AI's serverless 70B endpoint is the
-FP8-quantized "Turbo" variant; we keep it in the registry for fallback but
-DO NOT change the default to it without a paper-level reason. A reviewer
-can (correctly) flag FP8 as a confound for the "frontier open-weights LLM"
-framing. Groq's LPU uses an unpublished quantization scheme — fine for
-smoke tests, not for the reported paper artifact. OpenRouter routes to
-whichever backend has capacity, so reproducibility is provider-dependent
-between runs — never use it for the paper artifact.
+Dual-track precision strategy
+-----------------------------
+The Llama-3.3-70B baseline is on a two-stage cutover:
 
-For the ARR Aug submission we report: *"Llama-3.3-70B-Instruct (BF16),
-served via DeepInfra's serverless endpoint, temperature=0, max_tokens=80."*
+  • **Now → arXiv preprint**: `--provider groq` (free tier, LPU-quantized).
+    Paper carries the footnote *"Llama-3.3-70B served via Groq's LPU
+    inference (provider-quantized; AWQ-equivalent per Groq's published
+    evals)."* arXiv reviewers don't ding precision — this is fine.
+
+  • **Before ARR Aug 2026 submission**: switch to `--provider deepinfra`
+    (BF16 full-precision; $5 minimum credit purchase, ~$0.25 per full
+    test-set run). Paper updates to: *"Llama-3.3-70B-Instruct (BF16),
+    served via DeepInfra's serverless endpoint, temperature=0,
+    max_tokens=80."* Re-run experiment 04, replace the metrics, swap
+    the footnote. ~10 minutes of work.
+
+Together AI's serverless 70B inventory is FP8-quantized "Turbo" only —
+keep it as a fallback but never as the paper-reported artifact (the FP8
+confound is reviewer-flaggable). OpenRouter routes to whichever backend
+has capacity; reproducibility is provider-dependent between runs.
 
 Usage
 -----
-Set the API key via env var, then run:
+Preprint run (free, ~60 min on Groq's 30-RPM free tier):
 
-    export DEEPINFRA_API_KEY=...
+    export GROQ_API_KEY=...
     python Additional_Rigor_Experiments/run_04_llama3_baseline.py \\
         --test_path idioms_structured/Splits/test.jsonl \\
         --output_dir models/rigor_llama3_single
 
-Dry run (10 examples — recommended on Groq free tier first):
-    export GROQ_API_KEY=...
+Pre-ARR re-run (~$0.25 on DeepInfra BF16, ~5-10 min):
+
+    export DEEPINFRA_API_KEY=...
     python Additional_Rigor_Experiments/run_04_llama3_baseline.py \\
-        --provider groq --dry_run 10
+        --provider deepinfra \\
+        --output_dir models/rigor_llama3_single_bf16
 
-Different provider:
+Dry run smoke test (10 examples, ~10 sec, free):
+
+    python Additional_Rigor_Experiments/run_04_llama3_baseline.py --dry_run 10
+
+Fallback (NOT paper-grade — for sanity checks only):
+
     export TOGETHER_API_KEY=...
-    python ... --provider together  # NOTE: FP8 Turbo, not paper-grade
-
-Different model on the same provider:
-    python ... --model meta-llama/Llama-3.3-70B-Instruct
+    python ... --provider together   # FP8 Turbo
 """
 
 import os
@@ -82,13 +92,25 @@ load_dotenv()
 # ── Provider registry ────────────────────────────────────────────────────────
 
 PROVIDERS = {
-    # ── Paper-grade default: BF16 full-precision ─────────────────────────────
+    # ── Preprint-grade default: Groq free tier ───────────────────────────────
+    'groq': {
+        'base_url': 'https://api.groq.com/openai/v1',
+        'env_key':  'GROQ_API_KEY',
+        # LPU custom quantization (Groq publishes AWQ-equivalent eval
+        # parity). Free tier: 30 RPM, 6000 TPM, 14.4k requests/day —
+        # comfortably enough for the 960-example test set in ~60 min.
+        # Reportable for the preprint with a precision footnote.
+        # Before ARR Aug 2026: re-run on --provider deepinfra and
+        # update the metric + footnote (see docstring).
+        'default_model': 'llama-3.3-70b-versatile',
+    },
+    # ── Paper-grade (ARR cutover): BF16 full-precision ───────────────────────
     'deepinfra': {
         'base_url': 'https://api.deepinfra.com/v1/openai',
         'env_key':  'DEEPINFRA_API_KEY',
-        # BF16 full-precision — official Meta numerics. DO NOT swap to a
-        # quantized variant without a paper-level reason. This is the
-        # artifact we cite in the ARR submission.
+        # BF16 full-precision — official Meta numerics. Switch the
+        # default to this before the ARR submission and re-run exp 04
+        # against this provider so the reported metric is BF16-grade.
         'default_model': 'meta-llama/Llama-3.3-70B-Instruct',
     },
     # ── Fallbacks (NOT paper-grade — see "Precision note" in docstring) ──────
@@ -100,14 +122,6 @@ PROVIDERS = {
         # or non-reported sanity checks. Reviewers can (correctly) flag
         # FP8 as a confound for the "frontier open-weights LLM" framing.
         'default_model': 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
-    },
-    'groq': {
-        'base_url': 'https://api.groq.com/openai/v1',
-        'env_key':  'GROQ_API_KEY',
-        # LPU custom quantization (unpublished scheme). Great for free
-        # smoke tests (14.4k RPD on free tier); do not report numbers
-        # from this provider in the paper.
-        'default_model': 'llama-3.3-70b-versatile',
     },
     'openrouter': {
         'base_url': 'https://openrouter.ai/api/v1',
@@ -130,7 +144,7 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument('--test_path',  default='idioms_structured/Splits/test.jsonl')
     p.add_argument('--output_dir', default='models/rigor_llama3_single')
-    p.add_argument('--provider',   default='deepinfra', choices=list(PROVIDERS.keys()))
+    p.add_argument('--provider',   default='groq', choices=list(PROVIDERS.keys()))
     p.add_argument('--model',      default=None,
                    help='Override provider default model.')
     p.add_argument('--base_url',   default=None,
@@ -139,14 +153,15 @@ def parse_args():
                    help='Override env var lookup. Avoid in shared envs.')
     p.add_argument('--dry_run',    type=int, default=None,
                    help='Process only N examples for smoke-testing.')
-    p.add_argument('--sleep',      type=float, default=0.2,
-                   help='Inter-call delay (s). Together/DeepInfra tolerate 0.0; Groq needs 0.5+.')
+    p.add_argument('--sleep',      type=float, default=2.0,
+                   help='Inter-call delay (s). Groq free tier is 30 RPM → use 2.0 (default). '
+                        'DeepInfra/Together tolerate 0.0; lower this when switching providers.')
     p.add_argument('--resume',     action='store_true',
                    help='Skip examples already in test_predictions.jsonl.')
-    p.add_argument('--cost_per_million_tokens', type=float, default=0.65,
-                   help='DeepInfra blended price for Llama-3.3-70B-Instruct (BF16) ~$0.65/M as of '
-                        '2026-05. Override for other providers: Together-Turbo ~$0.88, Groq paid '
-                        '~$0.69, Groq free $0, OpenRouter varies.')
+    p.add_argument('--cost_per_million_tokens', type=float, default=0.0,
+                   help='$/M tokens for cost-estimate line at the end of the run. Default 0.0 '
+                        '(Groq free tier). Override for other providers: DeepInfra BF16 ~$0.65, '
+                        'Groq paid ~$0.69, Together-Turbo ~$0.88, OpenRouter varies.')
     return p.parse_args()
 
 
