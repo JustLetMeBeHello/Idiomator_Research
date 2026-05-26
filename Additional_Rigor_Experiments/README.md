@@ -26,7 +26,7 @@ are added.
    - If Telugu BIO still ≈ 0.000 with MuRIL → IdiomBERT's architectural claim hardens. The QA-style necessity claim becomes Main-defensible.
 2. **`run_02_xlmr_qa_vs_bio.sh`** — parallel to 01, same GPU.
 3. **`run_03_muril_joint.sh`** — after 01/02.
-4. **`run_04_llama3_baseline.py`** — runs off-GPU via Together AI / DeepInfra API. Can run concurrently with 01-03.
+4. **`run_04_llama3_baseline.py`** — runs off-GPU via DeepInfra API (BF16 full-precision; see script docstring "Precision note" for provider rationale). Doesn't need Colab at all — runs locally on a laptop in ~5-10 min. Run it in parallel with 01-03.
 
 ## Colab quickstart
 
@@ -72,12 +72,14 @@ and `Evaluation/Full_evaluation.py` without modification.
 | 01 BIO + MuRIL | ~45 min | ~2.5 hr | full training (EN+ES+HI+TE), 6 epochs |
 | 02 XLM-R (joint + BIO) | ~90 min | ~5 hr | two trainings, run sequentially in the script |
 | 03 MuRIL Joint | ~50 min | ~2.5 hr | full training, 7 epochs |
-| 04 Llama-3.3-70B | ~30 min | n/a (API) | Together AI inference, ~$15-30 budget |
+| 04 Llama-3.3-70B | ~5-10 min (laptop) | n/a (API) | DeepInfra BF16, ~$0.25 budget |
 
 ## Cost summary
 
-GPU: Colab Pro+ ($50/mo) covers all four with margin.
-LLM API: ~$15-30 total for Llama-3.3 inference on common test (956) + Indonesian (328).
+GPU: Colab Pro+ ($50/mo) covers experiments 01-03 with margin.
+LLM API: ~$0.23 for the mandatory single-stage run on test (960 calls × ~360 tokens
+@ ~$0.65/M on DeepInfra). Worst case ~$1.10 if we add 4-shot parity and a 5-seed
+variance sweep. Earlier "$15-30" estimate was wrong by ~50×.
 
 ## On hyperparameter tuning
 
