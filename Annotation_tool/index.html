@@ -622,6 +622,12 @@
     <div class="progress-label" id="progressLabel">0 / 0</div>
   </div>
   <div class="topbar-right">
+    <div id="pendingBadge"
+         style="display:none;padding:4px 10px;border-radius:6px;
+                background:#fbbf24;color:#000;font-size:12px;font-weight:600;
+                cursor:pointer"
+         title="Annotations saved locally but not yet synced to server. Click to retry."
+         onclick="drainQueue()">⟳ 0 pending sync</div>
     <div class="lang-badge" id="langBadge" style="display:none">—</div>
     <button class="btn-back-lang" id="btnChangeLang" style="display:none" onclick="goToLangSelect()">↩ Languages</button>
     <button class="btn-help" onclick="openHelp()" title="Annotation guide">?</button>
@@ -855,8 +861,11 @@
 
 // Empty string = same origin (works on Railway).
 // Override with full URL only for local dev against a separate server.
-const API       = window.location.port === '5500' ? 'http://localhost:8000' : '';
-const STORE_KEY = 'idiombank_v2';
+const API         = window.location.port === '5500' ? 'http://localhost:8000' : '';
+const STORE_KEY   = 'idiombank_v2';
+const PENDING_KEY = 'idiombank_pending_v1';     // queue of records not yet ack'd by /save
+const SAVE_TIMEOUT_MS = 8000;
+const DRAIN_INTERVAL_MS = 30000;
 
 let annotator     = '';
 let sessionId     = crypto.randomUUID();
@@ -906,6 +915,85 @@ function loadState() {
     currentIdx   = s.currentIdx   || 0;
     return allExamples.length > 0;
   } catch(e) { return false; }
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// Reliable save: enqueue → POST with timeout → retry on failure.
+// Each annotation lives in `pendingQueue` (persisted to localStorage) until
+// the server returns 200 OK. The queue is drained on every submit, on page
+// load, and on a 30 s interval. The annotator never loses work to a network
+// blip — the worst case is the badge stays visible until connectivity returns.
+// ════════════════════════════════════════════════════════════════════════════
+
+let _draining = false;
+
+function loadPending() {
+  try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+
+function savePending(queue) {
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(queue)); }
+  catch(e) {}
+}
+
+function updatePendingBadge() {
+  const badge = document.getElementById('pendingBadge');
+  if (!badge) return;
+  const n = loadPending().length;
+  if (n === 0) {
+    badge.style.display = 'none';
+  } else {
+    badge.style.display = '';
+    badge.textContent   = `⟳ ${n} pending sync`;
+    badge.style.background = n > 10 ? '#f87171' : '#fbbf24';  // amber → red if backlog grows
+  }
+}
+
+function enqueueSave(record) {
+  const q = loadPending();
+  // Replace any existing entry with the same annotation_id (defensive — should be unique)
+  const filtered = q.filter(r => r.annotation_id !== record.annotation_id);
+  filtered.push(record);
+  savePending(filtered);
+  updatePendingBadge();
+}
+
+async function _postOne(record) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), SAVE_TIMEOUT_MS);
+  try {
+    const resp = await fetch(`${API}/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(record),
+      signal: ctrl.signal,
+    });
+    return resp.ok;
+  } catch(e) {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function drainQueue() {
+  if (_draining) return;
+  _draining = true;
+  try {
+    let q = loadPending();
+    if (q.length === 0) { updatePendingBadge(); return; }
+    const stillPending = [];
+    for (const rec of q) {
+      const ok = await _postOne(rec);
+      if (!ok) stillPending.push(rec);
+    }
+    savePending(stillPending);
+    updatePendingBadge();
+  } finally {
+    _draining = false;
+  }
 }
 
 
@@ -1312,12 +1400,11 @@ async function submitExample() {
   results[ex._idx] = record;
   saveStateLang();
 
-  // POST to API (fire and forget)
-  fetch(`${API}/save`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(record),
-  }).catch(() => {});
+  // Enqueue → background drain. Annotation persists in localStorage queue
+  // until the server acks; UI stays responsive (no await), and a badge
+  // shows the annotator if anything is still pending.
+  enqueueSave(record);
+  drainQueue();
 
   advanceForward();
 }
@@ -1467,6 +1554,26 @@ window.addEventListener('load', () => {
     showScreen('screenLang');
     renderLangGrid();
   }
+
+  // Surface any saves that didn't ack last session and start the background drain
+  updatePendingBadge();
+  drainQueue();
+  setInterval(drainQueue, DRAIN_INTERVAL_MS);
+
+  // Best-effort flush before the tab is closed (browsers may ignore async fetches
+  // after unload; localStorage queue is the real safety net regardless).
+  window.addEventListener('beforeunload', () => {
+    const q = loadPending();
+    if (q.length > 0 && navigator.sendBeacon) {
+      // sendBeacon is the only fetch-like call browsers reliably run during unload.
+      for (const rec of q) {
+        try {
+          navigator.sendBeacon(`${API}/save`,
+            new Blob([JSON.stringify(rec)], { type: 'application/json' }));
+        } catch(e) {}
+      }
+    }
+  });
 });
 </script>
 </body>

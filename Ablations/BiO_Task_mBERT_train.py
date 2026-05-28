@@ -352,6 +352,17 @@ def decode_bio_to_char_span(bio_preds, encoding, sentence, max_len):
     first_tok = span_tokens[0]
     last_tok  = span_tokens[-1]
 
+    # last_tok is the FIRST subtoken of the last span word. Walk forward
+    # through any continuation subtokens of that same word so char_end
+    # lands at the end of the full word, not at the end of its first
+    # subtoken. Without this, multi-subtoken endwords (very common for
+    # non-Latin scripts) get truncated mid-word.
+    last_word_id = word_ids[last_tok]
+    j = last_tok
+    while j + 1 < len(word_ids) and word_ids[j + 1] == last_word_id:
+        j += 1
+    last_tok = j
+
     if first_tok >= len(offsets) or last_tok >= len(offsets):
         return None, None
 
@@ -473,7 +484,14 @@ def evaluate(model, loader, tokenizer, examples, device, split_name, max_len):
 def save_model(model, tokenizer, output_dir):
     best = Path(output_dir) / 'best_model'
     best.mkdir(parents=True, exist_ok=True)
-    model.bert.save_pretrained(best)
+    model.bert.save_pretrained(best, safe_serialization=True)
+    weight_files = list(best.glob("*.safetensors")) + list(best.glob("pytorch_model.bin"))
+    if not weight_files:
+        raise RuntimeError(
+            f"Encoder save_pretrained() wrote no weights to {best}. "
+            f"Dir: {[p.name for p in best.iterdir()]}"
+        )
+    print(f"  Saved encoder ({sum(p.stat().st_size for p in weight_files)/1e6:.1f} MB) + head + tokenizer")
     tokenizer.save_pretrained(best)
     torch.save(model.head.state_dict(), best / 'bio_head.pt')
 

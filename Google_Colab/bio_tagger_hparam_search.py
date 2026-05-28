@@ -275,6 +275,11 @@ def decode_bio_to_char_span(bio_preds, encoding, sentence, max_len):
     if not span_tokens:
         return None, None
     ft, lt = span_tokens[0], span_tokens[-1]
+    # lt is the first subtoken of the last span word; extend to the last
+    # subtoken of that word so char_end isn't truncated mid-word.
+    last_wid = word_ids[lt]
+    while lt + 1 < len(word_ids) and word_ids[lt + 1] == last_wid:
+        lt += 1
     if ft >= len(offsets) or lt >= len(offsets):
         return None, None
     return int(offsets[ft][0]), int(min(offsets[lt][1], len(sentence)))
