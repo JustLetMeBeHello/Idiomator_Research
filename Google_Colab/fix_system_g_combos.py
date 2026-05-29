@@ -32,6 +32,7 @@ Run from the repo root on Colab:
 """
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -72,7 +73,12 @@ def main():
     print(f"Ablation dir : {abl}")
     print(f"Eval dir     : {evd}")
 
-    # ── Step 1: delete stale BIO checkpoint sentinels ─────────────────────────
+    # ── Step 1: delete stale BIO outputs so the harness actually retrains ──────
+    # run_language_ablation_matrix.py skips a job when EITHER the sentinel says
+    # "done" (checkpoint_done) OR the model outputs already exist (expected_done:
+    # bio_tagger/metrics.json + test_predictions.jsonl). Deleting only the
+    # sentinel is NOT enough — stale buggy-decoder preds still satisfy
+    # expected_done and the retrain is silently skipped. Delete BOTH.
     if not args.skip_retrain:
         ckpt_dir = evd / "job_checkpoints"
         removed = 0
@@ -81,6 +87,14 @@ def main():
                 f.unlink()
                 removed += 1
         print(f"\n[1] Removed {removed} stale '*__bio.json' sentinels from {ckpt_dir}")
+
+        wiped = 0
+        for c in COMBOS:
+            bio_dir = abl / c / "bio_tagger"
+            if bio_dir.exists():
+                shutil.rmtree(bio_dir)
+                wiped += 1
+        print(f"[1] Wiped {wiped} stale bio_tagger/ dirs (forces expected_done=False -> retrain)")
 
         # ── Step 2: retrain BIO across all 15 combos (fixed decoder) ──────────
         print("\n[2] Retraining BIO across all combos (fixed decoder)...")
