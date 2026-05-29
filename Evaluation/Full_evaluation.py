@@ -978,8 +978,29 @@ def evaluate_system_g(bio_preds, n_bootstrap=10000):
             pt, lo, hi = id_ci[key]
             print(f"  {label_str:<18} {pt:<10.4f} [{lo:.4f}, {hi:.4f}]")
 
+    # Implicit classification: any predicted span → 'idiomatic', no span → 'literal'
+    # Derives sentence-level cls_f1 from BIO output without a dedicated classifier head.
+    cls_lang_gold: dict = defaultdict(list)
+    cls_lang_pred: dict = defaultdict(list)
+    for r in records:
+        lang     = r['language']
+        gold_lbl = LABEL2ID.get(r.get('idiomaticity', 'idiomatic'), 1)
+        pred_lbl = 1 if r.get('pred_span_start') is not None else 0
+        cls_lang_gold[lang].append(gold_lbl)
+        cls_lang_pred[lang].append(pred_lbl)
+    cls_results: dict = {}
+    all_cg: list = []
+    all_cp: list = []
+    for lang in sorted(cls_lang_gold.keys()):
+        f1 = f1_score(cls_lang_gold[lang], cls_lang_pred[lang], average='macro')
+        cls_results[lang] = round(f1, 4)
+        all_cg.extend(cls_lang_gold[lang])
+        all_cp.extend(cls_lang_pred[lang])
+    cls_results['Overall'] = round(f1_score(all_cg, all_cp, average='macro'), 4)
+    print(f"\n  Implicit cls F1 (any predicted span → idiomatic): {cls_results}")
+
     return {
-        'cls_f1':          None,   # no classifier
+        'cls_f1':          cls_results,  # derived: any span → idiomatic, no span → literal
         'span_all':        {'exact': exact_all,  'overlap': overlap_all},
         'span_e2e':        {'exact': exact_idio, 'overlap': overlap_idio},
         'span_correct_id': {'exact': exact_idio, 'overlap': overlap_idio},
