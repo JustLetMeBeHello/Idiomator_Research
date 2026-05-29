@@ -87,7 +87,7 @@ def extract_g(combo: str, data: dict) -> dict:
     row["stability_mean"]  = stab.get("mean_joint")
     row["stability_std"]   = stab.get("std_joint")
     row["stability_score"] = stab.get("stability")
-    indo = g.get("indonesian_ci", {})
+    indo = g.get("indonesian_ci") or {}
     row["indo_span_overlap"] = (indo.get("span_overlap") or [None])[0]
     row["indo_span_exact"]   = (indo.get("span_exact")   or [None])[0]
     return row
