@@ -2,13 +2,14 @@
   "model_name": "bert-base-multilingual-cased",
   "data_dir": "idioms_structured/Splits",
   "dropout": 0.23943117966801888,
-  "output_dir": "models/bio_tagger_en_hi_te",
+  "output_dir": "/content/drive/MyDrive/models/bio_tagger_en_hi_te",
   "langs": [
     "English",
     "Hindi",
     "Telugu",
     "Spanish"
   ],
+  "test_langs": null,
   "epochs": 6,
   "batch_size": 32,
   "lr": 3.27e-05,

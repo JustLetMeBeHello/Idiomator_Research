@@ -17,3 +17,10 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# session handoff log — local only, mirrored to Obsidian vault
+HANDOFF.md
+CLAUDE.md
+
+# Claude Code
+.claude/

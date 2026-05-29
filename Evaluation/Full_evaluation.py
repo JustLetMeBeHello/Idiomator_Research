@@ -524,6 +524,7 @@ def evaluate_system_a(s1_mbert, s2_mbert, n_bootstrap=10000):
         ci = compute_small_lang_bootstrap(s1_mbert, s2_mbert, n_resamples=n_bootstrap, lang_filter=lang)
         print_small_lang_ci(f"{lang} held-out generalization:", ci)
     small_lang_ci = compute_small_lang_bootstrap(s1_mbert, s2_mbert, n_resamples=n_bootstrap)
+    indonesian_ci = compute_small_lang_bootstrap(s1_mbert, s2_mbert, lang_filter='Indonesian', n_resamples=n_bootstrap)
 
 
     return {
@@ -534,7 +535,8 @@ def evaluate_system_a(s1_mbert, s2_mbert, n_bootstrap=10000):
         'joint_acc':       round(joint_acc, 4),
         'joint_f1':        joint_f1,
         'stability':       stability,
-        'small_lang_ci': small_lang_ci,
+        'small_lang_ci':   small_lang_ci,
+        'indonesian_ci':   indonesian_ci,
     }
 
 
@@ -582,6 +584,7 @@ def evaluate_system_b(s1_gpt, s2_gpt, n_bootstrap=10000):
         ci = compute_small_lang_bootstrap(s1_gpt, s2_gpt, n_resamples=n_bootstrap, lang_filter=lang)
         print_small_lang_ci(f"{lang} held-out generalization:", ci)
     small_lang_ci = compute_small_lang_bootstrap(s1_gpt, s2_gpt, n_resamples=n_bootstrap)
+    indonesian_ci = compute_small_lang_bootstrap(s1_gpt, s2_gpt, lang_filter='Indonesian', n_resamples=n_bootstrap)
 
 
     return {
@@ -592,7 +595,8 @@ def evaluate_system_b(s1_gpt, s2_gpt, n_bootstrap=10000):
         'joint_acc':       round(joint_acc, 4),
         'joint_f1':        joint_f1,
         'stability':       stability,
-        'small_lang_ci': small_lang_ci,
+        'small_lang_ci':   small_lang_ci,
+        'indonesian_ci':   indonesian_ci,
     }
 
 
@@ -652,6 +656,7 @@ def evaluate_system_c(single_gpt, n_bootstrap=10000):
         ci = compute_small_lang_bootstrap(single_gpt, single_gpt, n_resamples=n_bootstrap, lang_filter=lang)
         print_small_lang_ci(f"{lang} held-out generalization:", ci)
     small_lang_ci = compute_small_lang_bootstrap(single_gpt, single_gpt, n_resamples=n_bootstrap)
+    indonesian_ci = compute_small_lang_bootstrap(single_gpt, single_gpt, lang_filter='Indonesian', n_resamples=n_bootstrap)
 
 
     return {
@@ -663,6 +668,7 @@ def evaluate_system_c(single_gpt, n_bootstrap=10000):
         'joint_f1':        joint_f1,
         'stability':       stability,
         'small_lang_ci':   small_lang_ci,
+        'indonesian_ci':   indonesian_ci,
     }
 
 
@@ -710,6 +716,7 @@ def evaluate_system_d(s1_mbert, span2_joint, n_bootstrap=10000):
         ci = compute_small_lang_bootstrap(s1_mbert, span2_joint, n_resamples=n_bootstrap, lang_filter=lang)
         print_small_lang_ci(f"{lang} held-out generalization:", ci)
     small_lang_ci = compute_small_lang_bootstrap(s1_mbert, span2_joint, n_resamples=n_bootstrap)
+    indonesian_ci = compute_small_lang_bootstrap(s1_mbert, span2_joint, lang_filter='Indonesian', n_resamples=n_bootstrap)
 
 
     return {
@@ -720,7 +727,8 @@ def evaluate_system_d(s1_mbert, span2_joint, n_bootstrap=10000):
         'joint_acc':       round(joint_acc, 4),
         'joint_f1':        joint_f1,
         'stability':       stability,
-        'small_lang_ci': small_lang_ci,
+        'small_lang_ci':   small_lang_ci,
+        'indonesian_ci':   indonesian_ci,
     }
 
 
@@ -783,6 +791,7 @@ def evaluate_system_e(joint_preds, n_bootstrap=10000):
         ci = compute_small_lang_bootstrap(joint_preds, joint_preds, n_resamples=n_bootstrap, lang_filter=lang)
         print_small_lang_ci(f"{lang} held-out generalization:", ci)
     small_lang_ci = compute_small_lang_bootstrap(joint_preds, joint_preds, n_resamples=n_bootstrap)
+    indonesian_ci = compute_small_lang_bootstrap(joint_preds, joint_preds, lang_filter='Indonesian', n_resamples=n_bootstrap)
 
 
     return {
@@ -794,6 +803,7 @@ def evaluate_system_e(joint_preds, n_bootstrap=10000):
         'joint_f1':        joint_f1,
         'stability':       stability,
         'small_lang_ci':   small_lang_ci,
+        'indonesian_ci':   indonesian_ci,
     }
 
 
@@ -848,6 +858,7 @@ def evaluate_system_f(seq_phase1, seq_phase2, n_bootstrap=10000):
         ci = compute_small_lang_bootstrap(seq_phase1, seq_phase2, n_resamples=n_bootstrap, lang_filter=lang)
         print_small_lang_ci(f"{lang} held-out generalization:", ci)
     small_lang_ci = compute_small_lang_bootstrap(seq_phase1, seq_phase2, n_resamples=n_bootstrap)
+    indonesian_ci = compute_small_lang_bootstrap(seq_phase1, seq_phase2, lang_filter='Indonesian', n_resamples=n_bootstrap)
 
 
     return {
@@ -859,6 +870,7 @@ def evaluate_system_f(seq_phase1, seq_phase2, n_bootstrap=10000):
         'joint_f1':        joint_f1,
         'stability':       stability,
         'small_lang_ci':   small_lang_ci,
+        'indonesian_ci':   indonesian_ci,
     }
 
 # ── System G: BIO Tagger ─────────────────────────────────────────────────────
@@ -1033,6 +1045,8 @@ def evaluate_system_b4(s1_gpt4, s2_gpt4, n_bootstrap=10000):
         print_small_lang_ci(f"{lang} held-out generalization:", ci)
     small_lang_ci = compute_small_lang_bootstrap(s1_gpt4, s2_gpt4, pred_label_key=PRED_KEY,
                                                  n_resamples=n_bootstrap)
+    indonesian_ci = compute_small_lang_bootstrap(s1_gpt4, s2_gpt4, pred_label_key=PRED_KEY,
+                                                 lang_filter='Indonesian', n_resamples=n_bootstrap)
 
     return {
         'cls_f1':          cls_results,
@@ -1043,6 +1057,7 @@ def evaluate_system_b4(s1_gpt4, s2_gpt4, n_bootstrap=10000):
         'joint_f1':        joint_f1,
         'stability':       stability,
         'small_lang_ci':   small_lang_ci,
+        'indonesian_ci':   indonesian_ci,
     }
 
 
@@ -1111,6 +1126,9 @@ def evaluate_system_c4(single_gpt4, n_bootstrap=10000):
     small_lang_ci = compute_small_lang_bootstrap(single_gpt4, single_gpt4,
                                                  pred_label_key='pred_label',
                                                  n_resamples=n_bootstrap)
+    indonesian_ci = compute_small_lang_bootstrap(single_gpt4, single_gpt4,
+                                                 pred_label_key='pred_label',
+                                                 lang_filter='Indonesian', n_resamples=n_bootstrap)
 
     return {
         'cls_f1':          cls_results,
@@ -1121,6 +1139,7 @@ def evaluate_system_c4(single_gpt4, n_bootstrap=10000):
         'joint_f1':        joint_f1,
         'stability':       stability,
         'small_lang_ci':   small_lang_ci,
+        'indonesian_ci':   indonesian_ci,
     }
 
 

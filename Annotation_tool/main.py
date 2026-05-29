@@ -44,6 +44,14 @@ _raw_db_url  = os.environ.get("DATABASE_URL", f"sqlite:///{DB_PATH}")
 DATABASE_URL = _raw_db_url.replace("postgres://", "postgresql://", 1)
 
 _is_sqlite   = DATABASE_URL.startswith("sqlite")
+
+# Fail loud on Railway if Postgres addon isn't attached — SQLite is ephemeral there
+if os.environ.get("PORT") and _is_sqlite:
+    raise RuntimeError(
+        "Running on Railway (PORT is set) but DATABASE_URL is not a Postgres URL. "
+        "Attach a Postgres addon in the Railway dashboard so annotations survive redeploys."
+    )
+
 _engine_kwargs = {"connect_args": {"check_same_thread": False}} if _is_sqlite else {}
 engine = create_engine(DATABASE_URL, **_engine_kwargs)
 SessionLocal = sessionmaker(bind=engine)
@@ -294,7 +302,13 @@ def save_annotation(annotation: Annotation):
         row = AnnotationDB(**annotation.model_dump())
         db.merge(row)
         db.commit()
+        # Verify row actually landed — don't trust the write
+        saved = db.get(AnnotationDB, annotation.annotation_id)
+        if saved is None:
+            raise HTTPException(500, "Write verification failed: row not found after commit")
         return {"status": "saved", "annotation_id": annotation.annotation_id}
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(500, str(e))

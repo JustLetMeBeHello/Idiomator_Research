@@ -6,10 +6,16 @@
     "Telugu",
     "Spanish"
   ],
-  "best_epoch": 5,
-  "best_dev_overlap": 0.729177331395007,
-  "test_exact_match": 0.3085,
-  "test_overlap_f1": 0.7161,
+  "test_langs": [
+    "English",
+    "Hindi",
+    "Telugu",
+    "Spanish"
+  ],
+  "best_epoch": 6,
+  "best_dev_overlap": 0.8353711240035626,
+  "test_exact_match": 0.6424,
+  "test_overlap_f1": 0.822,
   "train_size": 5081,
   "dev_size": 631,
   "test_size": 632,

@@ -79,14 +79,25 @@ def main() -> None:
     print(f"[•] Base model : {args.base_model}")
 
     # 1. Build a BertForTokenClassification with the right shape.
-    print("[•] Loading base model as BertForTokenClassification ...")
+    # Prefer the fine-tuned encoder in src/ over downloading base model from hub.
+    encoder_src = src if (src / "model.safetensors").exists() or (src / "pytorch_model.bin").exists() else args.base_model
+    print(f"[•] Loading encoder from: {encoder_src}")
+    from transformers import BertModel
+    bert_encoder = BertModel.from_pretrained(str(encoder_src))
     model = BertForTokenClassification.from_pretrained(
         args.base_model,
         num_labels=len(LABEL2ID),
         id2label=ID2LABEL,
         label2id=LABEL2ID,
         classifier_dropout=args.dropout,
+        ignore_mismatched_sizes=True,
     )
+    # BertForTokenClassification drops the pooler, so pooler keys will be unexpected — that's fine.
+    missing, unexpected = model.bert.load_state_dict(bert_encoder.state_dict(), strict=False)
+    unexpected_non_pooler = [k for k in unexpected if not k.startswith("pooler")]
+    if missing or unexpected_non_pooler:
+        raise RuntimeError(f"Encoder load had missing={missing} unexpected={unexpected_non_pooler}")
+    print(f"[•] Fine-tuned encoder loaded ({sum(p.numel() for p in bert_encoder.parameters()):,} params)")
 
     # 2. Load the trained BIO head into the classifier.
     print(f"[•] Loading BIO head weights from {head_pt} ...")
