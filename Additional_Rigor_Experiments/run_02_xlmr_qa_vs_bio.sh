@@ -26,7 +26,36 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-mkdir -p models/rigor_joint_xlmr_full models/rigor_bio_xlmr_full
+# ── Persistence gate (CLAUDE.md hard rule) ──────────────────────────────────
+# /content is ephemeral on Colab; only Drive survives a disconnect. Set
+# DRIVE_OUT to a mounted-Drive path to force rigor outputs through to Drive
+# via symlink, then HARD-FAIL before training if the link is not actually
+# Drive-backed and writable. Leave DRIVE_OUT unset only for local runs.
+if [[ -n "${DRIVE_OUT:-}" ]]; then
+    for name in rigor_joint_xlmr_full rigor_bio_xlmr_full; do
+        mkdir -p "$DRIVE_OUT/$name"
+        rm -rf "models/$name"            # drop stale local dir/link
+        ln -s "$DRIVE_OUT/$name" "models/$name"
+    done
+    # Gate: islink + target-under-Drive + write/readback proof, else exit 1.
+    python - "$DRIVE_OUT" <<'PY'
+import os, sys
+drive = os.path.realpath(sys.argv[1])
+for name in ("rigor_joint_xlmr_full", "rigor_bio_xlmr_full"):
+    p = os.path.join("models", name)
+    assert os.path.islink(p), f"{p} is not a symlink — output would be ephemeral"
+    tgt = os.path.realpath(p)
+    assert tgt.startswith(drive), f"{p} -> {tgt} not under Drive ({drive})"
+    probe = os.path.join(p, ".persist_probe")
+    open(probe, "w").write("ok")
+    assert open(probe).read() == "ok", f"readback failed at {probe}"
+    os.remove(probe)
+print("✓ persistence gate passed — rigor outputs are Drive-backed and writable")
+PY
+else
+    echo "⚠ DRIVE_OUT unset — outputs go to local models/ (OK locally; EPHEMERAL on Colab)"
+    mkdir -p models/rigor_joint_xlmr_full models/rigor_bio_xlmr_full
+fi
 
 echo
 echo "── A) System E + XLM-R (Joint) ────────────────────────────────────────"
