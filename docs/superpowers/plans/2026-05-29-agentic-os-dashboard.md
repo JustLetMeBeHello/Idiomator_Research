@@ -6,7 +6,7 @@
 
 **Architecture:** FastAPI backend reads repo files + memory markdown fresh per request, exposes typed JSON. React/vite frontend renders a desktop with draggable windows. Next-Step engine derives tasks from `project_overview.md` ordering rules; completion does a surgical, backed-up, read-back-verified line edit on the source markdown.
 
-**Tech Stack:** Python 3.12 (FastAPI, uvicorn, pytest), Node 22 (vite, React, TypeScript, vitest). Backend deps installed into existing `.venv`.
+**Tech Stack:** Python 3.9.6 (FastAPI, uvicorn, pytest), Node 26 (vite, React, TypeScript, vitest). Backend deps installed into existing `.venv` (already has fastapi).
 
 **Reference spec:** `docs/superpowers/specs/2026-05-29-agentic-os-dashboard-design.md`
 
@@ -21,7 +21,16 @@
 - Run backend tests: `.venv/bin/python -m pytest agentic_os/backend/tests -v`.
 - Frontend lives in `agentic_os/frontend`; `npm install` then `npm run dev` (vite default port 5173). Tests: `npm run test`.
 - **CLAUDE.md hard rules that bind this code:** never invent metric values (fail loud if a parse fails); never call a write "done" without re-reading the persisted artifact; report metrics at 2 decimals.
-- Confirmed JSON shape of `results/pipeline_eval/pipeline_eval_results.json`: top-level dict keyed by 9 system ids (`system_a_mbert_pipeline`, `system_b_gpt_pipeline`, `system_b4_gpt_pipeline_4shot`, `system_c_gpt_single`, `system_c4_gpt_single_4shot`, `system_d_mbert_s1_joint_span`, `system_e_joint_end_to_end`, `system_f_sequential_phase1_ph2`, `system_g_bio_tagger`). Each value: `{cls_f1: float, joint_acc: float, joint_f1: float, span_standalone|span_all: {EN,ES,HI,TE,ID,overall}, span_e2e: {...}, span_correct_id: {...}, stability: {...}, small_lang_ci|indonesian_ci: dict}`. System G uses key `span_all` (not `span_standalone`) and `indonesian_ci` (not `small_lang_ci`).
+- **Python 3.9 compat (HARD):** target interpreter is 3.9.6. PEP 604 unions (`X | None`) are evaluated at function-def time on 3.9 and raise `TypeError`. Every backend `.py` file in this plan MUST start with `from __future__ import annotations` as its first line. With that import, all annotations (incl. `dict | None`, `list[dict]`, `dict[str, float]`) become lazy strings and are safe. The code blocks below show the import where a file uses `|`; add it to every backend file regardless.
+- **Confirmed JSON shape** of `results/pipeline_eval/pipeline_eval_results.json` (probed from the real file): top-level dict keyed by 9 system ids (`system_a_mbert_pipeline`, `system_b_gpt_pipeline`, `system_b4_gpt_pipeline_4shot`, `system_c_gpt_single`, `system_c4_gpt_single_4shot`, `system_d_mbert_s1_joint_span`, `system_e_joint_end_to_end`, `system_f_sequential_phase1_ph2`, `system_g_bio_tagger`). Each value is **deeply nested**:
+  - `cls_f1` → dict `{English, Hindi, Indonesian, Spanish, Telugu, Overall}` (floats). Overall cls F1 = `node["cls_f1"]["Overall"]`.
+  - `joint_acc` → top-level float.
+  - `joint_f1` → dict per language + `Overall`, and `node["joint_f1"]["Overall"]["macro_avg_f1"]` is the headline macro-avg Joint F1 (matches key_numbers; e.g. A = 0.7486).
+  - `stability` → dict `{mean_joint, std_joint, worst_lang, worst_f1, gap, stability, langs}`; the scalar stability score = `node["stability"]["stability"]` (e.g. A = 0.7049).
+  - `span_standalone` (A–F) / `span_all` (G) → `{exact:{...}, overlap:{...}}`.
+  - `span_e2e`, `span_correct_id` → `{exact, overlap}`.
+  - CI key: A–F use `small_lang_ci`, G uses `indonesian_ci` → `{n_examples, cls_accuracy, span_exact, span_overlap, joint_f1}` (each a 3-list `[point, lo, hi]`).
+  System G uses key `span_all` (not `span_standalone`) and `indonesian_ci` (not `small_lang_ci`).
 
 ---
 
@@ -92,6 +101,8 @@ Expected: FAIL — `ModuleNotFoundError: agentic_os.backend.config`.
 
 `agentic_os/backend/config.py`:
 ```python
+from __future__ import annotations
+
 import os
 from pathlib import Path
 
@@ -202,6 +213,8 @@ Expected: FAIL — module not found.
 
 `agentic_os/backend/parsers/key_numbers.py`:
 ```python
+from __future__ import annotations
+
 import re
 
 SYSTEMS = ["A", "B", "B4", "C", "C4", "D", "E", "F", "G"]
@@ -371,20 +384,29 @@ git commit -m "feat(aos): parse ablation matrix from key_numbers.md"
 
 - [ ] **Step 1: Create the JSON fixture**
 
-`agentic_os/backend/tests/fixtures/pipeline_eval_sample.json`:
+`agentic_os/backend/tests/fixtures/pipeline_eval_sample.json` (mirrors the REAL nested shape — trimmed to the keys the loader reads):
 ```json
 {
   "system_a_mbert_pipeline": {
-    "cls_f1": 0.7823, "joint_acc": 0.6622, "joint_f1": 0.7486,
-    "span_standalone": {"EN": 0.8, "ES": 0.8, "HI": 0.7, "TE": 0.7, "ID": 0.7, "overall": 0.76},
-    "span_e2e": {"overall": 0.72}, "span_correct_id": {"overall": 0.7},
-    "stability": {"overall": 0.7049}, "small_lang_ci": {}
+    "cls_f1": {"English": 0.8063, "Overall": 0.7823},
+    "joint_acc": 0.6464,
+    "joint_f1": {"English": {"macro_f1": 0.8023}, "Overall": {"macro_f1": 0.7631, "macro_avg_f1": 0.7486}},
+    "span_standalone": {"exact": {"Overall": 0.6287}, "overlap": {"Overall": 0.8168}},
+    "span_e2e": {"exact": {"Overall": 0.4926}, "overlap": {"Overall": 0.6571}},
+    "span_correct_id": {"exact": {"Overall": 0.6409}, "overlap": {"Overall": 0.8549}},
+    "stability": {"mean_joint": 0.7486, "std_joint": 0.0437, "stability": 0.7049,
+                  "langs": {"English": 0.8023, "Spanish": 0.7309, "Hindi": 0.687, "Telugu": 0.774}},
+    "small_lang_ci": {"n_examples": 124, "joint_f1": [0.7339, 0.6532, 0.8065]}
   },
   "system_g_bio_tagger": {
-    "cls_f1": 0.0, "joint_acc": 0.5952, "joint_f1": 0.4750,
-    "span_all": {"overall": 0.79}, "span_e2e": {"overall": 0.79},
-    "span_correct_id": {"overall": 0.59},
-    "stability": {"overall": 0.4658}, "indonesian_ci": {}
+    "cls_f1": {"Overall": 0.0},
+    "joint_acc": 0.5952,
+    "joint_f1": {"Overall": {"macro_f1": 0.4668, "macro_avg_f1": 0.4750}},
+    "span_all": {"exact": {"Overall": 0.59}, "overlap": {"Overall": 0.79}},
+    "span_e2e": {"exact": {"Overall": 0.59}, "overlap": {"Overall": 0.79}},
+    "span_correct_id": {"exact": {"Overall": 0.59}, "overlap": {"Overall": 0.79}},
+    "stability": {"mean_joint": 0.4658, "std_joint": 0.0, "stability": 0.4658, "langs": {}},
+    "indonesian_ci": {"n_examples": 325, "joint_f1": [0.7192, 0.6782, 0.7577]}
   }
 }
 ```
@@ -402,7 +424,8 @@ FIX = Path(__file__).parent / "fixtures" / "pipeline_eval_sample.json"
 def test_load_returns_systems():
     data = results.load_results(FIX)
     assert "system_a_mbert_pipeline" in data
-    assert data["system_a_mbert_pipeline"]["joint_f1"] == 0.7486
+    # joint_f1 is a nested dict in the real shape
+    assert data["system_a_mbert_pipeline"]["joint_f1"]["Overall"]["macro_avg_f1"] == 0.7486
 
 def test_label_for_system_id():
     assert results.label_for("system_a_mbert_pipeline") == "A"
@@ -412,6 +435,8 @@ def test_label_for_system_id():
 def test_live_joint_f1_by_label():
     live = results.live_by_label(FIX)
     assert live["A"]["joint_f1"] == 0.7486
+    assert live["A"]["stability"] == 0.7049
+    assert live["A"]["cls_f1"] == 0.7823
     assert live["G"]["joint_f1"] == 0.4750
 
 def test_missing_file_raises():
@@ -428,6 +453,8 @@ Expected: FAIL — module not found.
 
 `agentic_os/backend/sources/results.py`:
 ```python
+from __future__ import annotations
+
 import json
 from pathlib import Path
 
@@ -456,19 +483,31 @@ def load_results(path: Path) -> dict:
     return json.loads(path.read_text())
 
 
-def live_by_label(path: Path) -> dict[str, dict]:
-    """Reduce the full JSON to {label: {joint_f1, stability, cls_f1}}."""
+def _dig(node: dict, *path):
+    """Walk nested dicts; return None if any key is missing/non-dict."""
+    cur = node
+    for k in path:
+        if not isinstance(cur, dict) or k not in cur:
+            return None
+        cur = cur[k]
+    return cur
+
+
+def live_by_label(path: Path) -> dict:
+    """Reduce the full nested JSON to {label: {joint_f1, stability, cls_f1}} scalars."""
     raw = load_results(path)
     out = {}
     for sid, node in raw.items():
         label = ID_TO_LABEL.get(sid)
         if label is None:
             continue
-        stab = node.get("stability", {})
         out[label] = {
-            "joint_f1": node.get("joint_f1"),
-            "stability": stab.get("overall") if isinstance(stab, dict) else stab,
-            "cls_f1": node.get("cls_f1"),
+            # headline macro-avg Joint F1 lives at joint_f1.Overall.macro_avg_f1
+            "joint_f1": _dig(node, "joint_f1", "Overall", "macro_avg_f1"),
+            # scalar stability score lives at stability.stability
+            "stability": _dig(node, "stability", "stability"),
+            # overall classification F1 lives at cls_f1.Overall
+            "cls_f1": _dig(node, "cls_f1", "Overall"),
         }
     return out
 ```
@@ -530,6 +569,8 @@ Expected: FAIL — module not found.
 
 `agentic_os/backend/sources/systems_view.py`:
 ```python
+from __future__ import annotations
+
 TOL = 0.005  # 2-decimal reporting tolerance
 
 
@@ -632,6 +673,8 @@ Expected: FAIL — module not found.
 
 `agentic_os/backend/parsers/project_overview.py`:
 ```python
+from __future__ import annotations
+
 import re
 
 STATUS_MAP = [
@@ -774,6 +817,8 @@ Expected: FAIL — module not found.
 
 `agentic_os/backend/tasks/derive.py`:
 ```python
+from __future__ import annotations  # required: `dict | None` return annotation on 3.9
+
 # Run-order priority for rigor experiments (lower = sooner).
 EXP_ORDER = {"02": 10, "03": 11, "04": 20, "06-dryrun": 30, "06": 31, "07": 40}
 
@@ -920,6 +965,8 @@ Expected: FAIL — module not found.
 
 `agentic_os/backend/tasks/writeback.py`:
 ```python
+from __future__ import annotations
+
 import re
 import shutil
 import time
@@ -1026,6 +1073,8 @@ Expected: FAIL — module not found.
 
 `agentic_os/backend/sources/git_activity.py`:
 ```python
+from __future__ import annotations
+
 import subprocess
 from pathlib import Path
 
