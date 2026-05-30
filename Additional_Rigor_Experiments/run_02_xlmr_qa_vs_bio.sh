@@ -1,18 +1,24 @@
 #!/usr/bin/env bash
 # ── Experiment 02: XLM-R replication of QA-vs-BIO ────────────────────────────
 #
-# Verifies the QA-style-beats-BIO finding survives an encoder swap. Single
-# biggest ceiling-mover identified by the council — if QA still beats BIO
-# on Telugu under XLM-R, the architectural claim generalizes beyond mBERT
-# and IdiomBERT becomes Main-eligible at NAACL 2027.
+# Tests whether the Joint-vs-BIO comparison survives an encoder swap from
+# mBERT to XLM-R.
+#
+# CORRECTED 2026-05-28: the original premise here — "mBERT BIO fails on Telugu
+# (exact=0.00)" — was a decoder/encoder bug, NOT a real result. Post-fix,
+# System G mBERT BIO scores Telugu exact=0.77 / overlap F1=0.88 (see
+# memory/key_numbers.md). Pure BIO is a competitive multilingual span
+# extractor; the QA/staged advantage is in joint classify+extract, not span
+# extraction. So this run checks whether the Joint-F1 gap holds under a second
+# encoder — it is NOT testing a BIO span-extraction failure.
 #
 # Two trainings, run sequentially on the same GPU:
 #   A) Joint mBERT (System E) → encoder = xlm-roberta-base
 #   B) BIO Tagger (System G)  → encoder = xlm-roberta-base
 #
-# Important tokenizer note: XLM-R uses SentencePiece. The BIO run will
-# probably *partially* recover on Telugu even before MuRIL, which is itself
-# a publishable finding ("tokenizer dominates labeling-scheme choice").
+# Tokenizer note: XLM-R uses SentencePiece vs mBERT WordPiece. Compare XLM-R
+# BIO Telugu span exact against System G mBERT's corrected 0.77 to see whether
+# the tokenizer family shifts span quality either way.
 #
 # Hyperparameters: identical to the main-paper Systems E and G, except lr
 # dropped from 2e-5 → 1e-5 for the Joint head (XLM-R standard practice).
@@ -86,10 +92,13 @@ python Ablations/BiO_Task_mBERT_train.py \
 
 echo
 echo "── Experiment 02 complete ─────────────────────────────────────────────"
-echo "Key comparisons (vs IdiomBERT main paper Table 3):"
-echo "  - Joint XLM-R Joint F1 (TE) vs System E mBERT (0.7903)"
-echo "  - BIO XLM-R exact match (TE) vs System G mBERT (0.0000)"
-echo "  - Indonesian zero-shot Joint F1 vs System E (0.7685)"
+echo "Key comparisons (mBERT baselines from memory/key_numbers.md):"
+echo "  - BIO XLM-R Telugu span exact   vs System G mBERT 0.77 (post decoder fix)"
+echo "  - BIO XLM-R Telugu span overlap vs System G mBERT 0.88"
+echo "  - Joint XLM-R Telugu Joint F1    vs System E mBERT 0.79 (macro Joint F1 0.74)"
+echo "  - Indonesian zero-shot Joint F1  vs System E mBERT 0.77"
 echo
-echo "If BIO + XLM-R still fails on Telugu → architectural claim holds across"
-echo "two encoders, two tokenizer families. Strong Main-track narrative."
+echo "NOTE: 'mBERT BIO Telugu exact = 0.00' was a decoder/encoder bug, corrected"
+echo "to 0.77 on 2026-05-28. mBERT BIO does NOT fail on Telugu. Frame this run as:"
+echo "does the Joint-vs-BIO gap survive an XLM-R encoder swap? — not as a BIO"
+echo "span-extraction failure test."

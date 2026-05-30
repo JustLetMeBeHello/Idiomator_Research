@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # ── Experiment 01: BIO + MuRIL Telugu recovery ───────────────────────────────
 #
-# Tests whether the Telugu BIO failure (exact match = 0.0000 in IdiomBERT
-# Table 3) is architectural (BIO labeling scheme is wrong for this task) or
-# tokenizer-driven (mBERT WordPiece fragments Telugu abugida clusters).
+# PERMANENTLY SKIPPED (do not run). Its premise — "Telugu BIO exact match =
+# 0.0000" — was a decoder/encoder bug, not a real result. Post-fix, System G
+# mBERT BIO scores Telugu exact = 0.77 (see memory/key_numbers.md), so the
+# MuRIL recovery this script was built to test has nothing left to recover.
+# Kept only for provenance.
+#
+# Original (now-invalid) premise: whether the Telugu BIO "failure" was
+# architectural or tokenizer-driven (mBERT WordPiece fragments Telugu abugida).
 #
 # Method: identical System G setup, only encoder swapped.
 #   mBERT (bert-base-multilingual-cased) → MuRIL (google/muril-base-cased)
@@ -40,6 +45,6 @@ python Ablations/BiO_Task_mBERT_train.py \
 
 echo
 echo "── Experiment 01 complete ─────────────────────────────────────────────"
-echo "Compare TE exact match to System G mBERT baseline (0.0000)."
+echo "Compare TE exact match to System G mBERT baseline (0.77, post decoder fix)."
 echo "Predictions: models/rigor_bio_muril_full/test_predictions.jsonl"
 echo "Run Evaluation/Full_evaluation.py to fold into the system table."
