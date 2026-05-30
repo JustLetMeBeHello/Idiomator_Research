@@ -20,6 +20,14 @@ def _edit_line(text: str, eid: str) -> str:
     for i, ln in enumerate(lines):
         if ln.strip().startswith(f"| {eid} "):
             cells = ln.rstrip("\n").split("|")
+            # A well-formed 5-column body row splits into exactly 7 elements:
+            # ['', ' eid ', ' script ', ' what ', ' status ', ' notes ', '']
+            # (leading + trailing empty strings from the surrounding pipes).
+            if len(cells) != 7:
+                raise ValueError(
+                    f"Malformed experiment row for {eid}: expected 5 columns, "
+                    f"got {len(cells) - 2} (split produced {len(cells)} elements)"
+                )
             # status is the 4th data column -> index 4 in split (leading empty at 0)
             cells[4] = f" {DONE_CELL} "
             newline = "|".join(cells)
@@ -53,3 +61,5 @@ def mark_experiment_done(path: Path, eid: str, dry_run: bool = False) -> None:
         raise RuntimeError(
             f"read-back verification failed for exp {eid}; restored from {backup}"
         )
+    # Success: remove backup so .bak files don't accumulate next to memory files.
+    backup.unlink(missing_ok=True)
