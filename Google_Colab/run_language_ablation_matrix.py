@@ -19,6 +19,13 @@ Useful options:
     python -u Google_Colab/run_language_ablation_matrix.py --only_combo en_es
     python -u Google_Colab/run_language_ablation_matrix.py --only_system joint
     python -u Google_Colab/run_language_ablation_matrix.py --keep_checkpoints
+
+Rerun after a code fix (idempotency hard rule — stale "✓ skip" is NOT success):
+    # bypass BOTH resume gates and delete stale outputs before rerunning
+    python -u Google_Colab/run_language_ablation_matrix.py --force --only_combo en_es
+    python -u Google_Colab/run_language_ablation_matrix.py --force --only_system bio
+A plain rerun trusts checkpoint sentinels and existing artifacts; after you change
+training/eval code those are stale and will silently re-report old numbers. Use --force.
 """
 
 from __future__ import annotations
@@ -86,6 +93,15 @@ def parse_args() -> argparse.Namespace:
         default=None,
     )
     p.add_argument("--keep_checkpoints", action="store_true")
+    p.add_argument(
+        "--force",
+        action="store_true",
+        help=(
+            "Bypass both resume gates (checkpoint sentinel + expected_done) and "
+            "delete stale outputs for each selected job before rerunning. Use after "
+            "a code fix so retrains are clean, not silently skipped on stale artifacts."
+        ),
+    )
 
     # Locked paper/default hyperparameters.
     p.add_argument("--stage1_lr", default="3e-5")
@@ -163,6 +179,40 @@ def mark_done(args: argparse.Namespace, job: Job) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
         json.dump({"combo": job.combo, "system": job.system, "status": "done"}, f, indent=2)
+
+
+def wipe_stale(args: argparse.Namespace, job: Job) -> None:
+    """Delete a job's outputs + checkpoint sentinel so a --force rerun is clean.
+
+    Without this, a rerun after a code fix can hit expected_done() on stale
+    artifacts (or trust a stale sentinel) and silently re-report old numbers.
+    """
+    base = Path(args.ablation_dir) / job.combo
+    eval_base = Path(args.eval_dir) / job.combo
+    # Output dirs (train systems) or files (eval) produced by each job.
+    targets = {
+        "stage1": [base / "stage1_mbert"],
+        "stage2": [base / "stage2_mbert"],
+        "joint": [base / "joint_mbert"],
+        "sequential": [base / "sequential_mbert"],
+        "bio": [base / "bio_tagger"],
+        "eval": [eval_base / "pipeline_eval_results.json"],
+    }[job.system]
+
+    removed = []
+    for t in targets:
+        if t.is_dir():
+            shutil.rmtree(t, ignore_errors=True)
+            removed.append(str(t))
+        elif t.exists():
+            t.unlink()
+            removed.append(str(t))
+    sentinel = checkpoint_path(args, job)
+    if sentinel.exists():
+        sentinel.unlink()
+        removed.append(str(sentinel))
+    if removed:
+        tqdm.write(f"⟲ force-wiped {job.name}: {', '.join(removed)}")
 
 
 def run_live(args: argparse.Namespace, job: Job, cmd: list[str]) -> None:
@@ -337,8 +387,13 @@ def main() -> None:
     jobs = build_jobs(args)
     completed = 0
 
+    if args.force:
+        print("FORCE: resume gates bypassed; stale outputs wiped per job.", flush=True)
+
     for job in tqdm(jobs, desc="Ablation jobs", unit="job"):
-        if checkpoint_done(args, job) or expected_done(args, job):
+        if args.force:
+            wipe_stale(args, job)
+        elif checkpoint_done(args, job) or expected_done(args, job):
             mark_done(args, job)
             tqdm.write(f"✓ skip {job.name}")
             completed += 1
