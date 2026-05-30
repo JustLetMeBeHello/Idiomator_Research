@@ -6,7 +6,7 @@
 
 **Architecture:** FastAPI backend reads repo files + memory markdown fresh per request, exposes typed JSON. React/vite frontend renders a desktop with draggable windows. Next-Step engine derives tasks from `project_overview.md` ordering rules; completion does a surgical, backed-up, read-back-verified line edit on the source markdown.
 
-**Tech Stack:** Python 3.9.6 (FastAPI, uvicorn, pytest), Node 26 (vite, React, TypeScript, vitest). Backend deps installed into existing `.venv` (already has fastapi).
+**Tech Stack:** Python 3.12.7 (FastAPI, uvicorn, pytest), Node 26 (vite, React, TypeScript, vitest). Backend deps live in the existing `.venv` (already has fastapi). `from __future__ import annotations` is kept on every backend file as defensive forward-compat — harmless on 3.12.
 
 **Reference spec:** `docs/superpowers/specs/2026-05-29-agentic-os-dashboard-design.md`
 
@@ -14,11 +14,19 @@
 
 ## Conventions for the implementing engineer
 
-- **Repo root** = `/Users/shishirmaddineni/Desktop/Idiomator_Research/Research_And_Training`. All paths below are relative to it unless absolute.
-- **Memory dir** (absolute) = `/Users/shishirmaddineni/.claude/projects/-Users-shishirmaddineni-Desktop-Idiomator-Research-Research-And-Training/memory`.
-- Backend runs from `.venv`: `source .venv/bin/activate` first. Install with `.venv/bin/pip install fastapi "uvicorn[standard]" pytest httpx`.
-- Run backend: `.venv/bin/python -m uvicorn agentic_os.backend.main:app --reload --port 8011` (run from repo root).
-- Run backend tests: `.venv/bin/python -m pytest agentic_os/backend/tests -v`.
+- **WORKING DIRECTORY (cwd for all work)** = the git worktree at
+  `/Users/shishirmaddineni/Desktop/Idiomator_Research/Research_And_Training/.claude/worktrees/agentic-os-dashboard`.
+  Create `agentic_os/` here. All `git add`/`git commit` happen here (branch `worktree-agentic-os-dashboard`).
+- **PYTHON INTERPRETER (absolute)** = `/Users/shishirmaddineni/Desktop/Idiomator_Research/Research_And_Training/.venv/bin/python`
+  (Python 3.12.7, fastapi already installed). The worktree has NO local `.venv`, so wherever this plan says
+  `.venv/bin/python` or `.venv/bin/pip`, use this absolute path instead. Do NOT `source activate`; call the absolute path directly.
+  Example test run: `/Users/shishirmaddineni/Desktop/Idiomator_Research/Research_And_Training/.venv/bin/python -m pytest agentic_os/backend/tests -v` (run from the worktree cwd; `PYTHONPATH=.` if imports fail).
+- If `httpx` is missing (needed by FastAPI TestClient), install once:
+  `/Users/shishirmaddineni/Desktop/Idiomator_Research/Research_And_Training/.venv/bin/pip install httpx`.
+- **Memory/source-of-truth paths used by config.py** (absolute, stable):
+  - Memory dir = `/Users/shishirmaddineni/.claude/projects/-Users-shishirmaddineni-Desktop-Idiomator-Research-Research-And-Training/memory`.
+  - `config.REPO_ROOT` defaults to the stable **main checkout** root `/Users/shishirmaddineni/Desktop/Idiomator_Research/Research_And_Training` (survives worktree cleanup; holds canonical `results/pipeline_eval/pipeline_eval_results.json` + memory). Keep Task 1's `config.py` default exactly as written — do NOT point it at the worktree.
+- Run backend live: `<abs-python> -m uvicorn agentic_os.backend.main:app --reload --port 8011` from the worktree cwd.
 - Frontend lives in `agentic_os/frontend`; `npm install` then `npm run dev` (vite default port 5173). Tests: `npm run test`.
 - **CLAUDE.md hard rules that bind this code:** never invent metric values (fail loud if a parse fails); never call a write "done" without re-reading the persisted artifact; report metrics at 2 decimals.
 - **Python 3.9 compat (HARD):** target interpreter is 3.9.6. PEP 604 unions (`X | None`) are evaluated at function-def time on 3.9 and raise `TypeError`. Every backend `.py` file in this plan MUST start with `from __future__ import annotations` as its first line. With that import, all annotations (incl. `dict | None`, `list[dict]`, `dict[str, float]`) become lazy strings and are safe. The code blocks below show the import where a file uses `|`; add it to every backend file regardless.
