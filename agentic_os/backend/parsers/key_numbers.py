@@ -50,3 +50,36 @@ def parse_systems(text: str) -> dict[str, dict]:
             "cls_f1": cls.get(s),
         }
     return out
+
+
+def parse_ablation(text: str) -> list[dict]:
+    """Parse the 15-combo ablation markdown table into a list of row dicts."""
+    lines = text.splitlines()
+    start = None
+    for i, ln in enumerate(lines):
+        if ln.startswith("##") and "Ablation Matrix" in ln:
+            start = i
+            break
+    if start is None:
+        raise ValueError("Ablation Matrix section not found")
+    rows = []
+    for ln in lines[start:]:
+        if not ln.strip().startswith("|"):
+            continue
+        cells = [c.strip().strip("*") for c in ln.strip().strip("|").split("|")]
+        if len(cells) != 4:
+            continue
+        if cells[0].lower() in ("combo", "") or set(cells[0]) <= {"-"}:
+            continue
+        try:
+            rows.append({
+                "combo": cells[0],
+                "span_f1": float(cells[1]),
+                "indo_f1": float(cells[2]),
+                "stability": float(cells[3]),
+            })
+        except ValueError:
+            continue
+    if not rows:
+        raise ValueError("Ablation Matrix table had no parseable rows")
+    return rows

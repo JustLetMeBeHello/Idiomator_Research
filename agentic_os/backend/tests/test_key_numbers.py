@@ -24,3 +24,15 @@ def test_parse_cls_f1_shared_ad():
 def test_missing_section_raises():
     with pytest.raises(ValueError, match="Joint F1"):
         key_numbers.parse_systems("# nothing useful here")
+
+def test_parse_ablation_matrix():
+    rows = key_numbers.parse_ablation(FIX.read_text())
+    by_combo = {r["combo"]: r for r in rows}
+    assert by_combo["en"]["span_f1"] == 0.7348
+    assert by_combo["en_es_hi_te"]["span_f1"] == 0.8072
+    assert by_combo["en_es_hi_te"]["indo_f1"] == 0.7209
+    assert by_combo["en_es_hi_te"]["stability"] == 0.4699
+
+def test_ablation_missing_raises():
+    with pytest.raises(ValueError, match="Ablation"):
+        key_numbers.parse_ablation("no table here")
