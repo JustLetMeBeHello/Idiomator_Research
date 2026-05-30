@@ -42,7 +42,7 @@ def parse_experiments(text: str) -> list[dict]:
 
 
 def parse_blockers(text: str) -> list[dict]:
-    """Parse the numbered 'Blocking TODOs' list."""
+    """Parse the numbered 'Blocking TODOs' lists from ALL sections."""
     out = []
     in_block = False
     for ln in text.splitlines():
@@ -50,10 +50,12 @@ def parse_blockers(text: str) -> list[dict]:
             in_block = True
             continue
         if in_block:
+            if ln.strip().startswith("##"):
+                # End this block but keep scanning for more sections
+                in_block = False
+                continue
             m = re.match(r"\d+\.\s+(.*)", ln.strip())
             if not m:
-                if ln.strip().startswith("##"):
-                    break
                 continue
             body = m.group(1)
             title = re.sub(r"[*]", "", body).strip()

@@ -15,3 +15,29 @@ def test_parse_blockers_marks_hard():
     iaa = next(b for b in blockers if "IAA" in b["title"])
     assert iaa["hard_blocker"] is True
     assert any(not b["hard_blocker"] for b in blockers)
+
+
+MULTI = """## IdiomBERT
+
+**Blocking TODOs:**
+1. Error analysis table (§9) — manual.
+2. HF checkpoint IDs.
+
+## MultiIdiom
+
+**Blocking TODOs:**
+1. **IAA table (§5.1) — HARD BLOCKER.** Needs 2 annotators.
+2. Annotator demographics paragraph.
+
+## Next Section
+"""
+
+def test_parse_blockers_accumulates_all_sections():
+    blockers = po.parse_blockers(MULTI)
+    titles = [b["title"] for b in blockers]
+    # captures BOTH sections (4 total), not just the first
+    assert len(blockers) == 4
+    assert any("IAA" in t for t in titles)
+    iaa = next(b for b in blockers if "IAA" in b["title"])
+    assert iaa["hard_blocker"] is True
+    # a stray '## Next Section' with no list must not crash or add items
