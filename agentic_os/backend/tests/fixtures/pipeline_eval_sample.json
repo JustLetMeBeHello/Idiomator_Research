@@ -1,0 +1,23 @@
+{
+  "system_a_mbert_pipeline": {
+    "cls_f1": {"English": 0.8063, "Overall": 0.7823},
+    "joint_acc": 0.6464,
+    "joint_f1": {"English": {"macro_f1": 0.8023}, "Overall": {"macro_f1": 0.7631, "macro_avg_f1": 0.7486}},
+    "span_standalone": {"exact": {"Overall": 0.6287}, "overlap": {"Overall": 0.8168}},
+    "span_e2e": {"exact": {"Overall": 0.4926}, "overlap": {"Overall": 0.6571}},
+    "span_correct_id": {"exact": {"Overall": 0.6409}, "overlap": {"Overall": 0.8549}},
+    "stability": {"mean_joint": 0.7486, "std_joint": 0.0437, "stability": 0.7049,
+                  "langs": {"English": 0.8023, "Spanish": 0.7309, "Hindi": 0.687, "Telugu": 0.774}},
+    "small_lang_ci": {"n_examples": 124, "joint_f1": [0.7339, 0.6532, 0.8065]}
+  },
+  "system_g_bio_tagger": {
+    "cls_f1": {"Overall": 0.0},
+    "joint_acc": 0.5952,
+    "joint_f1": {"Overall": {"macro_f1": 0.4668, "macro_avg_f1": 0.4750}},
+    "span_all": {"exact": {"Overall": 0.59}, "overlap": {"Overall": 0.79}},
+    "span_e2e": {"exact": {"Overall": 0.59}, "overlap": {"Overall": 0.79}},
+    "span_correct_id": {"exact": {"Overall": 0.59}, "overlap": {"Overall": 0.79}},
+    "stability": {"mean_joint": 0.4658, "std_joint": 0.0, "stability": 0.4658, "langs": {}},
+    "indonesian_ci": {"n_examples": 325, "joint_f1": [0.7192, 0.6782, 0.7577]}
+  }
+}
