@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from agentic_os.backend import config
-from agentic_os.backend.routes import research, system
+from agentic_os.backend.routes import research, system, tasks
 
 app = FastAPI(title="Personal Agentic OS")
 app.add_middleware(
@@ -22,3 +22,4 @@ def _startup():
 
 app.include_router(system.router)
 app.include_router(research.router)
+app.include_router(tasks.router)
