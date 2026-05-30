@@ -43,10 +43,9 @@ python Train_Join.py \
 
 echo
 echo "── Experiment 03 complete ─────────────────────────────────────────────"
-echo "Key comparisons (vs IdiomBERT main paper Table 4):"
-echo "  - HI Joint F1 vs System E mBERT (0.6357) — expect MuRIL to help"
-echo "  - TE Joint F1 vs System E mBERT (0.7903) — expect MuRIL to help"
-echo "  - ES Joint F1 vs System E mBERT (0.7520) — may drop (acceptable)"
-echo "  - Indonesian zero-shot vs System E mBERT (0.7685) — likely drop"
+echo "Compare MuRIL Joint vs System E mBERT baselines (computed live, never hardcoded):"
+python Additional_Rigor_Experiments/mbert_baselines.py --system E || \
+    echo "  (run Evaluation/Full_evaluation.py to populate the results json)"
+echo "Expectation: MuRIL helps HI/TE, may drop ES (acceptable), Indonesian likely drops."
 echo
 echo "Add as row 'E (MuRIL)' to Tables 2, 4, 6, 7."

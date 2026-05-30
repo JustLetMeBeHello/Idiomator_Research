@@ -92,13 +92,11 @@ python Ablations/BiO_Task_mBERT_train.py \
 
 echo
 echo "── Experiment 02 complete ─────────────────────────────────────────────"
-echo "Key comparisons (mBERT baselines from memory/key_numbers.md):"
-echo "  - BIO XLM-R Telugu span exact   vs System G mBERT 0.77 (post decoder fix)"
-echo "  - BIO XLM-R Telugu span overlap vs System G mBERT 0.88"
-echo "  - Joint XLM-R Telugu Joint F1    vs System E mBERT 0.79 (macro Joint F1 0.74)"
-echo "  - Indonesian zero-shot Joint F1  vs System E mBERT 0.77"
+echo "mBERT baselines to compare against (computed live, never hardcoded):"
+python Additional_Rigor_Experiments/mbert_baselines.py || \
+    echo "  (run Evaluation/Full_evaluation.py to populate the results json)"
 echo
-echo "NOTE: 'mBERT BIO Telugu exact = 0.00' was a decoder/encoder bug, corrected"
-echo "to 0.77 on 2026-05-28. mBERT BIO does NOT fail on Telugu. Frame this run as:"
-echo "does the Joint-vs-BIO gap survive an XLM-R encoder swap? — not as a BIO"
-echo "span-extraction failure test."
+echo "NOTE: 'mBERT BIO Telugu exact = 0.00' was a decoder/encoder bug, since"  # metric-drift:ok
+echo "corrected in the eval json (System G TE exact = 0.77). mBERT BIO does NOT"
+echo "fail on Telugu. Frame this run as: does the Joint-vs-BIO gap survive an"
+echo "XLM-R encoder swap? — not as a BIO span-extraction failure test."
