@@ -51,7 +51,7 @@ Drop-in drafts for the remaining ARR TODOs. Copy each section into LaTeX as need
 
 ## 2. Annotator demographics & proficiency (MultiIdiom, Section 5.1 or Appendix A)
 
-> **Annotator profile.** All idiomaticity, span, and sense-level annotations were produced by native speakers of the target language. Annotators were [TODO: N total, e.g., "five (two for English, two for Hindi, two for Telugu, one for Spanish, one for Indonesian")]; each language pack was annotated by speakers who had used the language as a primary medium of communication from childhood. No formal linguistic training was required, but annotators were briefed with the guide reproduced in Appendix B and completed [TODO: ~5–10] practice items before beginning the validation pass. Annotators were [TODO: compensated at $X/hour | uncompensated co-authors | volunteer collaborators], and annotation sessions averaged [TODO: ~X seconds] per item as measured by the tool's per-example timer. No personally identifying information was collected.
+> **Annotator profile.** All idiomaticity, span, and sense-level annotations were produced by native speakers of the target language. Annotators were [TODO: N total, e.g., "four (two for English, two for Telugu")]; each validated language pack was annotated by speakers who had used the language as a primary medium of communication from childhood. No formal linguistic training was required, but annotators were briefed with the guide reproduced in Appendix B and completed [TODO: ~5–10] practice items before beginning the validation pass. Annotators were [TODO: compensated at $X/hour | uncompensated co-authors | volunteer collaborators], and annotation sessions averaged [TODO: ~X seconds] per item as measured by the tool's per-example timer. No personally identifying information was collected.
 
 ---
 
@@ -112,7 +112,7 @@ Drop-in drafts for the remaining ARR TODOs. Copy each section into LaTeX as need
 > | Hindi   | [TODO] | [TODO] | [TODO] | [TODO] | [TODO] |
 > | Telugu  | [TODO] | [TODO] | [TODO] | [TODO] | [TODO] |
 >
-> [TODO: 2–3 sentence interpretation. Standard framing if all $\kappa \geq 0.6$: "Agreement falls in the *substantial* to *near-perfect* range (Landis & Koch, 1977) across all three languages on both dimensions, supporting the reliability of the validated test sets." If any language is below 0.6, discuss likely cause — e.g., higher polysemy in Telugu idioms, span boundary ambiguity around postpositions in Hindi.] Spanish and Indonesian test sets remain single-annotator (silver-standard) and we report pipeline-quality estimates rather than $\kappa$ for those languages.
+> [TODO: 2–3 sentence interpretation. Standard framing if all $\kappa \geq 0.6$: "Agreement falls in the *substantial* to *near-perfect* range (Landis & Koch, 1977) across all three languages on both dimensions, supporting the reliability of the validated test sets." If any language is below 0.6, discuss likely cause — e.g., higher polysemy in Telugu idioms, span boundary ambiguity around postpositions in Hindi.] The Spanish, Hindi, and Indonesian test sets are silver-standard (no human validation) and we report pipeline-quality estimates rather than $\kappa$ for those languages.
 
 ### Compute IAA script reminder
 
