@@ -193,9 +193,9 @@ def align_bio_labels(offsets, word_ids, char_start, char_end, max_len):
             prev_word_id = word_id
             continue
 
-        # First subtoken of a word — check if it falls inside the gold span
+        # First subtoken of a word — overlap check (handles SP leading-space offset)
         tok_char_s, tok_char_e = offset
-        in_span = (tok_char_s >= char_start) and (tok_char_e <= char_end)
+        in_span = min(tok_char_e, char_end) > max(tok_char_s, char_start)
 
         if in_span:
             # B-IDIOM for the very first span token, I-IDIOM for the rest
