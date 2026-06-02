@@ -28,6 +28,9 @@ import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 JSON_PATH = os.path.join(REPO, "results", "pipeline_eval", "pipeline_eval_results.json")
+# run_08 diagnostic JSON — optional, skipped if not yet committed.
+JSON_RUN08 = os.path.join(REPO, "Additional_Rigor_Experiments", "results",
+                          "run_08_extended_gold_s42.json")
 MEM = os.path.expanduser(
     "~/.claude/projects/-Users-shishirmaddineni-Desktop-Idiomator-Research-"
     "Research-And-Training/memory")
@@ -42,16 +45,38 @@ CLAIMS = [
         "name": "System G Telugu span exact",
         "needs": [r"telugu|\bTE\b", r"\bBIO\b|system\s*g", r"exact|\bEM\b"],
         "path": ["system_g_bio_tagger", "span_e2e", "exact", "Telugu"],
+        "json": JSON_PATH,
     },
     {
         "name": "System E Telugu Joint F1",
         "needs": [r"telugu|\bTE\b", r"system\s*e", r"joint\s*f1"],
         "path": ["system_e_joint_end_to_end", "joint_f1", "Telugu"],
+        "json": JSON_PATH,
     },
     {
         "name": "System E Indonesian zero-shot Joint F1",
         "needs": [r"indonesian", r"system\s*e", r"joint\s*f1|zero.?shot"],
         "path": ["system_e_joint_end_to_end", "joint_f1", "Indonesian"],
+        "json": JSON_PATH,
+    },
+    # run_08 extended-gold claims (active once run_08_extended_gold_s42.json is committed).
+    {
+        "name": "XLM-R strip gap (SP QA-BIO artifact verdict)",
+        "needs": [r"xlm.?r|xlmr", r"strip", r"gap|mean"],
+        "path": ["encoders", "xlmr", "mean_gap_by_mode", "strip"],
+        "json": JSON_RUN08,
+    },
+    {
+        "name": "XLM-R original EM gap (SP original)",
+        "needs": [r"xlm.?r|xlmr", r"original", r"gap|mean"],
+        "path": ["encoders", "xlmr", "mean_gap_by_mode", "original"],
+        "json": JSON_RUN08,
+    },
+    {
+        "name": "SP family strip gap (Scenario A verdict number)",
+        "needs": [r"sentencepiece|sp\s+family|sp=", r"strip"],
+        "path": ["family_mean_gap", "SentencePiece", "strip"],
+        "json": JSON_RUN08,
     },
 ]
 
@@ -87,13 +112,26 @@ def main():
 
     if not os.path.exists(JSON_PATH):
         sys.exit(f"ground-truth json not found: {JSON_PATH}")
-    data = json.load(open(JSON_PATH))
 
-    # resolve each claim's expected 2dp value from json
+    # load each unique JSON once
+    _loaded = {}
+    def load_json(path):
+        if path not in _loaded:
+            _loaded[path] = json.load(open(path)) if os.path.exists(path) else None
+        return _loaded[path]
+
+    # resolve each claim's expected 2dp value from its own json (skip if json absent)
+    active_claims = []
     for c in CLAIMS:
+        json_path = c.get("json", JSON_PATH)
+        data = load_json(json_path)
+        if data is None:
+            continue  # optional JSON not yet committed — skip silently
         v = get(data, c["path"])
         c["expected"] = f"{v:.2f}" if isinstance(v, (int, float)) else None
         c["needs_re"] = [re.compile(n, re.I) for n in c["needs"]]
+        active_claims.append(c)
+    CLAIMS[:] = active_claims
 
     files = []
     for pat in DEFAULT_TARGETS + args.add:
@@ -126,7 +164,7 @@ def main():
                                   line.strip()[:80]))
 
     if not flags:
-        print(f"✓ no metric drift across {len(CLAIMS)} claims.")
+        print(f"✓ no metric drift across {len(CLAIMS)} active claims.")
         return 0
     print(f"⚠ {len(flags)} stale metric claim(s) — fix to match ground-truth json:\n")
     for path, ln, name, exp, lits, ctx in flags:
