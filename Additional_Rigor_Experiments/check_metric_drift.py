@@ -30,7 +30,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 JSON_PATH = os.path.join(REPO, "results", "pipeline_eval", "pipeline_eval_results.json")
 # run_08 diagnostic JSON — optional, skipped if not yet committed.
 JSON_RUN08 = os.path.join(REPO, "Additional_Rigor_Experiments", "results",
-                          "run_08_extended_gold_s42.json")
+                          "run_08_extended_gold_s42_123_7.json")
 MEM = os.path.expanduser(
     "~/.claude/projects/-Users-shishirmaddineni-Desktop-Idiomator-Research-"
     "Research-And-Training/memory")
