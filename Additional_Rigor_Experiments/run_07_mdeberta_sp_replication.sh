@@ -105,7 +105,7 @@ run_joint () {  # $1=outdir  $2=epochs  $3=seed
     python -u "$JOINT" \
         --model_name "$MODEL" --output_dir "$1" \
         --langs $LANGS --test_langs $TEST_LANGS \
-        --epochs "$2" --batch_size "$BATCH" --lr 1e-5 \
+        --epochs "$2" --batch_size "$BATCH" --lr "${LR_JOINT:-3e-6}" \
         --cls_loss_weight 0.3 --span_loss_weight 1.9 --seed "$3" \
         2>&1 | tee -a "$1/console.log"
 }
@@ -113,7 +113,7 @@ run_bio () {    # $1=outdir  $2=epochs  $3=seed
     python -u "$BIO" \
         --model_name "$MODEL" --output_dir "$1" \
         --langs $LANGS --test_langs $TEST_LANGS \
-        --epochs "$2" --batch_size "$BATCH" --lr 3.27e-5 --o_weight 0.104 --seed "$3" \
+        --epochs "$2" --batch_size "$BATCH" --lr "${LR_BIO:-2e-6}" --o_weight 0.104 --seed "$3" \
         2>&1 | tee -a "$1/console.log"
 }
 
@@ -135,14 +135,14 @@ if [[ "$DRY_RUN" == "1" ]]; then
     echo; echo "── dry A) Joint (QA) ──"
     python -u "$JOINT" --model_name "$MODEL" --output_dir "$DJ" \
         --langs English --test_langs English \
-        --epochs 1 --batch_size 8 --lr 1e-5 \
+        --epochs 1 --batch_size 8 --lr "${LR_JOINT:-3e-6}" \
         --cls_loss_weight 0.3 --span_loss_weight 1.9 --seed 42 \
         2>&1 | tee -a "$DJ/console.log"
     assert_outputs "$DJ" "dry-joint"
     echo; echo "── dry B) BIO ──"
     python -u "$BIO" --model_name "$MODEL" --output_dir "$DB" \
         --langs English --test_langs English \
-        --epochs 1 --batch_size 8 --lr 3.27e-5 --o_weight 0.104 --seed 42 \
+        --epochs 1 --batch_size 8 --lr "${LR_BIO:-2e-6}" --o_weight 0.104 --seed 42 \
         2>&1 | tee -a "$DB/console.log"
     assert_outputs "$DB" "dry-bio"
     echo
