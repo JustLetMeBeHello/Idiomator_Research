@@ -535,7 +535,30 @@ def train(args):
             ) / 2
 
             loss = args.cls_loss_weight * cls_loss + args.span_loss_weight * span_loss
+
+            if torch.isnan(loss) or torch.isinf(loss):
+                # mDeBERTa-v3 disentangled attention can produce NaN/inf in the
+                # span or cls head on the first few batches.  Skip the batch so
+                # the optimizer state stays clean.
+                print(f"  ⚠ NaN/inf loss (cls={cls_loss.item():.4f} "
+                      f"span={span_loss.item():.4f}) — skipping batch")
+                optimizer.zero_grad()
+                scheduler.step()
+                continue
+
             loss.backward()
+
+            # mDeBERTa-v3 can emit NaN gradients via its position-bias
+            # computation even when the forward loss is finite.  Clipping
+            # a NaN is a no-op, so sanitise first.
+            nan_params = 0
+            for p in model.parameters():
+                if p.grad is not None and (torch.isnan(p.grad).any() or
+                                           torch.isinf(p.grad).any()):
+                    p.grad = torch.nan_to_num(p.grad, nan=0.0, posinf=0.0, neginf=0.0)
+                    nan_params += 1
+            if nan_params:
+                print(f"  ⚠ Sanitised NaN/inf grads in {nan_params} params")
 
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
