@@ -373,6 +373,14 @@ def decode_bio_to_char_span(bio_preds, encoding, sentence, max_len):
     if char_start is None or char_end is None:
         return None, None
     char_end = min(char_end, len(sentence))
+
+    # SentencePiece tokenizers (XLM-R, RemBERT, mDeBERTa) prepend ▁ to
+    # word-initial tokens, shifting the token's char offset left by one
+    # into the preceding space. Without this strip, every word-initial
+    # span boundary decodes one char early — exact_match collapses while
+    # overlap_f1 stays high (off-by-1 pattern). Skip leading whitespace.
+    while char_start < char_end and sentence[char_start].isspace():
+        char_start += 1
     return int(char_start), int(char_end)
 
 

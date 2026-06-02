@@ -201,7 +201,16 @@ def token_to_char_span(tokenizer, sentence, token_start, token_end, max_len):
     offsets = enc['offset_mapping']
     if token_start >= len(offsets) or token_end >= len(offsets):
         return None, None
-    return offsets[token_start][0], offsets[token_end][1]
+    cs, ce = offsets[token_start][0], offsets[token_end][1]
+    # SentencePiece tokenizers (XLM-R, RemBERT, mDeBERTa) prepend ▁ to
+    # word-initial tokens, shifting the token's char offset left by one
+    # into the preceding space. Without this strip, every word-initial
+    # span boundary decodes one char early under SP — exact_match collapses
+    # while overlap_f1 stays high. WordPiece tokenizers are unaffected
+    # (no whitespace at decoded char_start).
+    while cs < ce and sentence[cs].isspace():
+        cs += 1
+    return cs, ce
 
 
 def compute_overlap_f1(pred_start, pred_end, gold_start, gold_end):
