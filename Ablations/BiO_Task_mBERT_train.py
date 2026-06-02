@@ -302,7 +302,7 @@ class BIOTagger(torch.nn.Module):
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
         )
-        seq_out  = self.dropout(outputs.last_hidden_state)  # [B, T, H]
+        seq_out  = self.dropout(outputs.last_hidden_state.float())  # cast: mDeBERTa-v3 can emit fp16 on GPU
         logits   = self.head(seq_out)                        # [B, T, 3]
         return logits
 

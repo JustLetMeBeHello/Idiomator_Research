@@ -326,7 +326,7 @@ class JointIdiomModel(torch.nn.Module):
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
         )
-        seq_output = outputs.last_hidden_state      # [batch, seq_len, hidden]
+        seq_output = outputs.last_hidden_state.float()  # cast: mDeBERTa-v3 can emit fp16 on GPU
         cls_output = seq_output[:, 0, :]            # [batch, hidden]  ([CLS] token)
 
         cls_logits   = self.cls_head(cls_output)            # [batch, 2]
