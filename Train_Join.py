@@ -357,7 +357,7 @@ def load_best_model(model_name, output_dir, device):
     model      = JointIdiomModel(model_name)
     model.bert = AutoModel.from_pretrained(output_dir / 'best_model')
     heads      = torch.load(
-        output_dir / 'best_model' / 'task_heads.pt', map_location='cpu'
+        output_dir / 'best_model' / 'task_heads.pt', map_location='cpu', weights_only=True
     )
     model.cls_head.load_state_dict(heads['cls_head'])
     model.start_head.load_state_dict(heads['start_head'])

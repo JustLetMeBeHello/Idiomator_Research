@@ -498,8 +498,16 @@ def save_model(model, tokenizer, output_dir):
 
 def load_best_model(model_name, output_dir, device):
     best = Path(output_dir) / 'best_model'
-    model = BIOTagger(str(best))
-    model.head.load_state_dict(torch.load(best / 'bio_head.pt', map_location=device))
+    if not best.exists():
+        # No checkpoint was saved — dev overlap never improved above 0.
+        # Happens in short dry-runs (1 epoch). Fall back to the base HF model
+        # so test-eval can run and confirm code compatibility.
+        print(f"  ⚠ best_model/ not found (dev never improved). "
+              f"Loading base {model_name} for compatibility test eval.")
+        model = BIOTagger(model_name)
+    else:
+        model = BIOTagger(str(best))
+        model.head.load_state_dict(torch.load(best / 'bio_head.pt', map_location=device, weights_only=True))
     return model.to(device)
 
 
