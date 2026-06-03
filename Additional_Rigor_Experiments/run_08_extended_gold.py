@@ -252,7 +252,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--preds-root", required=True,
                     help="Root containing rembert/ and flip/ subdirs (Drive mount on Colab).")
-    ap.add_argument("--seeds", type=int, nargs="+", default=[42],
+    ap.add_argument("--seeds", type=int, nargs="+", default=[42,123],
                     help="Seeds to pool (default: 42 — the only one fully on Drive).")
     ap.add_argument("--n-bootstrap", type=int, default=10000)
     ap.add_argument("--out", default=None,
