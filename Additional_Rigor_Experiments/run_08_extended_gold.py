@@ -150,11 +150,31 @@ def _extend_gold(text, start, end):
     return start, end
 
 
+def _strip_sp_leading_space(text, start, end):
+    """Strip SentencePiece ▁ leading-space offset from a predicted start.
+
+    Train_Join.py saves the raw decoded char_start before whitespace-stripping
+    (the ▁ prefix pulls the offset one char left into the preceding space).
+    This mirrors the decoder patch in token_to_char_span so that predictions
+    generated directly from training (not re-decoded via run_05) score correctly.
+    No-op for WordPiece predictions and already-stripped XLM-R predictions
+    (no whitespace at their decoded start).
+    """
+    if start is None or end is None:
+        return start, end
+    while start < end and start < len(text) and text[start].isspace():
+        start += 1
+    return start, end
+
+
 def score_row(row, mode):
     """Return (exact, overlap_f1) for one prediction row under a gold mode."""
     text = row["sentence"]
     gs, ge = row["span_start"], row["span_end"]
     ps, pe = row.get("pred_span_start"), row.get("pred_span_end")
+
+    # Always fix SP ▁ leading-space offset on pred start (no-op for WP / already-stripped).
+    ps, pe = _strip_sp_leading_space(text, ps, pe)
 
     if mode == "extend":
         gs, ge = _extend_gold(text, gs, ge)
