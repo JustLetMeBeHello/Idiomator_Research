@@ -45,13 +45,13 @@ Outputs (incremental, Drive-safe):
 
 import os
 import re
-import csv
 import sys
 import json
 import argparse
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer, AutoModel
@@ -64,11 +64,7 @@ from tqdm import tqdm
 LABEL2ID = {'literal': 0, 'idiomatic': 1}
 ID2LABEL  = {0: 'literal', 1: 'idiomatic'}
 
-SEMEVAL_LABEL_MAP = {
-    '0': 'literal',    '1': 'idiomatic',
-    'lit': 'literal',  'idiom': 'idiomatic',
-    'literal': 'literal', 'idiomatic': 'idiomatic',
-}
+LANG_MAP = {'EN': 'English', 'PT': 'Portuguese', 'GL': 'Galician'}
 
 # EN has MWE-derived span; PT/GL are CLS-only
 SPAN_LANGS = {'English'}
@@ -79,11 +75,14 @@ SPAN_LANGS = {'English'}
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument('--data_dir',   required=True,
-                   help='Root of cloned semeval-2022-task-2-idiomaticity repo')
+                   help='Root of cloned H-TayyarMadabushi/SemEval_2022_Task2-idiomaticity repo')
     p.add_argument('--model_dir',  required=True,
                    help='System E model dir (contains best_model/ with encoder + task_heads.pt)')
     p.add_argument('--output_dir', default='Additional_Rigor_Experiments/results/semeval_eval')
-    p.add_argument('--split',      default='test', choices=['dev', 'test'])
+    p.add_argument('--split',      default='dev', choices=['dev'],
+                   help='Only dev has gold labels; test labels are withheld by organizers')
+    p.add_argument('--langs',      nargs='+', default=['EN'],
+                   help='Languages to evaluate. EN has span eval; PT is CLS-only. Default: EN only.')
     p.add_argument('--max_len',    type=int, default=128)
     p.add_argument('--batch_size', type=int, default=32)
     p.add_argument('--device',     default=None)
@@ -104,22 +103,6 @@ def get_device(forced=None):
 
 # ── Data loading ───────────────────────────────────────────────────────────────
 
-def find_semeval_file(data_dir: Path, lang_code: str, split: str) -> Path | None:
-    split_file = 'test.tsv' if split == 'test' else 'dev.tsv'
-    candidates = [
-        data_dir / 'data' / '2_test_set'      / 'subtask_a' / lang_code / split_file,
-        data_dir / 'data' / '1_train_and_dev'  / 'subtask_a' / lang_code / split_file,
-        data_dir / 'subtask_a' / lang_code / split_file,
-        data_dir / lang_code / split_file,
-        data_dir / 'data' / '2_test_set'      / 'subtask_a' / lang_code.lower() / split_file,
-        data_dir / 'data' / '1_train_and_dev'  / 'subtask_a' / lang_code.lower() / split_file,
-    ]
-    for c in candidates:
-        if c.exists():
-            return c
-    return None
-
-
 def locate_span(sentence: str, mwe: str) -> tuple[int | None, int | None]:
     idx = sentence.lower().find(mwe.lower())
     if idx != -1:
@@ -132,64 +115,79 @@ def locate_span(sentence: str, mwe: str) -> tuple[int | None, int | None]:
     return None, None
 
 
-def parse_tsv(tsv_path: Path, lang_label: str) -> list[dict]:
-    examples = []
-    with open(tsv_path, encoding='utf-8') as f:
-        first     = f.readline().strip().lower()
-        has_header = any(k in first for k in ('mwe', 'sentence', 'label', 'id'))
-        f.seek(0)
+def load_semeval_data(data_dir: Path, split: str, lang_codes: list[str]) -> dict[str, list[dict]]:
+    """Load SemEval-2022 Task 2 SubTaskA data.
 
-        if has_header:
-            reader = csv.DictReader(f, delimiter='\t')
-        else:
-            reader = csv.reader(f, delimiter='\t')
+    Repo layout (H-TayyarMadabushi):
+      SubTaskA/Data/dev.csv          — sentences (ID, Language, MWE, Previous, Target, Next)
+      SubTaskA/Data/dev_gold.csv     — labels    (ID, DataID, Language, Label)
 
-        skipped = 0
-        for i, row in enumerate(reader):
-            try:
-                if has_header:
-                    row_id   = row.get('ID', row.get('id', str(i)))
-                    mwe      = row.get('MWE', row.get('mwe', ''))
-                    sentence = row.get('sentence', row.get('Sentence', ''))
-                    raw_lbl  = row.get('label', row.get('Label', ''))
+    Join on ID. Use Target as sentence. Label: 0=literal, 1=idiomatic.
+    """
+    base = data_dir / 'SubTaskA' / 'Data'
+
+    sents_csv = base / f'{split}.csv'
+    gold_csv  = base / f'{split}_gold.csv'
+
+    if not sents_csv.exists():
+        raise FileNotFoundError(f"Sentences file not found: {sents_csv}")
+    if not gold_csv.exists():
+        raise FileNotFoundError(f"Gold labels file not found: {gold_csv}")
+
+    sents = pd.read_csv(sents_csv)
+    gold  = pd.read_csv(gold_csv)
+
+    # Join on ID
+    merged = sents.merge(gold[['ID', 'Label']], on='ID', how='inner')
+    print(f"  Loaded {len(merged)} labeled examples (split={split})")
+
+    all_examples: dict[str, list[dict]] = {}
+    for lang_code in lang_codes:
+        lang_label = LANG_MAP.get(lang_code, lang_code)
+        subset     = merged[merged['Language'] == lang_code]
+        if subset.empty:
+            print(f"  [{lang_label}] No examples found")
+            continue
+
+        examples = []
+        n_fallback = 0
+        for _, row in subset.iterrows():
+            sentence = str(row['Target'])
+            mwe      = str(row['MWE'])
+            label    = 'idiomatic' if int(row['Label']) == 1 else 'literal'
+
+            ex = {
+                'semeval_id':   str(row['ID']),
+                'idiom':        mwe,
+                'language':     lang_label,
+                'idiomaticity': label,
+                'sentence':     sentence,
+                'span_start':   None,
+                'span_end':     None,
+            }
+
+            if lang_label in SPAN_LANGS:
+                s, e = locate_span(sentence, mwe)
+                if s is not None:
+                    ex['span_start'] = s
+                    ex['span_end']   = e
                 else:
-                    row_id, mwe, _, sentence, raw_lbl = row[0], row[1], row[2], row[3], row[4]
+                    ex['span_start']    = 0
+                    ex['span_end']      = len(sentence)
+                    ex['span_fallback'] = True
+                    n_fallback         += 1
 
-                if not sentence:
-                    skipped += 1
-                    continue
-                label = SEMEVAL_LABEL_MAP.get(raw_lbl.strip().lower())
-                if label is None:
-                    skipped += 1
-                    continue
+            examples.append(ex)
 
-                ex = {
-                    'semeval_id':   row_id,
-                    'idiom':        mwe,
-                    'language':     lang_label,
-                    'idiomaticity': label,
-                    'sentence':     sentence,
-                    'span_start':   None,
-                    'span_end':     None,
-                }
+        dist = {k: sum(1 for e in examples if e['idiomaticity'] == k)
+                for k in ('idiomatic', 'literal')}
+        n_span = sum(1 for e in examples if e.get('span_start') is not None
+                     and not e.get('span_fallback'))
+        print(f"  [{lang_label}] {len(examples)} examples | {dist} | "
+              f"span_located={n_span} fallback={n_fallback}")
+        all_examples[lang_label] = examples
 
-                if lang_label in SPAN_LANGS:
-                    s, e = locate_span(sentence, mwe)
-                    if s is not None:
-                        ex['span_start'] = s
-                        ex['span_end']   = e
-                    else:
-                        ex['span_start']    = 0
-                        ex['span_end']      = len(sentence)
-                        ex['span_fallback'] = True
-
-                examples.append(ex)
-            except (IndexError, KeyError):
-                skipped += 1
-
-    if skipped:
-        print(f"  [{lang_label}] Skipped {skipped} malformed rows")
-    return examples
+    return all_examples
 
 
 # ── Span utilities ─────────────────────────────────────────────────────────────
@@ -440,26 +438,11 @@ def main():
     print(f"  ✓ Output dir durable")
 
     # ── Load data ─────────────────────────────────────────────────────────────
-    data_dir = Path(args.data_dir)
-    lang_map = [('EN', 'English'), ('PT', 'Portuguese'), ('GL', 'Galician')]
-    all_examples: dict[str, list[dict]] = {}
-
-    for code, label in lang_map:
-        tsv = find_semeval_file(data_dir, code, args.split)
-        if tsv is None:
-            print(f"  [{label}] {args.split}.tsv not found — skipping")
-            continue
-        exs = parse_tsv(tsv, label)
-        if not exs:
-            print(f"  [{label}] Empty after parsing — skipping")
-            continue
-        dist     = {k: sum(1 for e in exs if e['idiomaticity'] == k) for k in ('idiomatic', 'literal')}
-        n_span   = sum(1 for e in exs if e.get('span_start') is not None)
-        print(f"  [{label}] {len(exs)} examples | {dist} | span={n_span}")
-        all_examples[label] = exs
+    data_dir     = Path(args.data_dir)
+    all_examples = load_semeval_data(data_dir, args.split, args.langs)
 
     if not all_examples:
-        print("No data found. Check --data_dir.")
+        print("No data found. Check --data_dir and --langs.")
         sys.exit(1)
 
     flat = [ex for exs in all_examples.values() for ex in exs]
