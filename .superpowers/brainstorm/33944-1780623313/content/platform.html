@@ -1,0 +1,81 @@
+<h2>Where does ProductivityOS live?</h2>
+<p class="subtitle">This is the biggest architectural decision — it determines data flow, sync complexity, and how "integrated" everything actually feels.</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1e1e2e;padding:18px;border-radius:6px;font-family:monospace;font-size:12px;color:#cdd6f4;">
+      <div style="color:#89b4fa;margin-bottom:8px">ResearchOS.app (extended)</div>
+      <div style="display:flex;gap:8px">
+        <div style="background:#313244;border-radius:4px;padding:8px;flex:1;font-size:11px">
+          <div style="color:#a6e3a1">📊 Research</div>
+          <div style="color:#6c7086;margin-top:4px">Projects · Sessions · Jobs</div>
+        </div>
+        <div style="background:#313244;border-radius:4px;padding:8px;flex:1;font-size:11px;border:1px solid #89b4fa">
+          <div style="color:#cba6f7">⚡ ProductivityOS</div>
+          <div style="color:#6c7086;margin-top:4px">1% List · Journal · Stats</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;color:#6c7086;font-size:10px">↕ Python backend reads Obsidian .md files directly</div>
+    </div>
+    <div class="card-body">
+      <h3>A — Extend ResearchOS (new tab)</h3>
+      <p>Add a ProductivityOS tab to the existing desktop app. Python reads/writes Obsidian vault directly. One app, everything in one place. No deployment needed.</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Pros</h4><ul><li>Already built &amp; running</li><li>Direct Obsidian file access</li><li>One window for everything</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Locked to desktop</li><li>Plain HTML/CSS (no shadcn)</li><li>Charts need Chart.js, not React</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0f172a;padding:18px;border-radius:6px;font-family:monospace;font-size:12px;color:#e2e8f0;">
+      <div style="color:#38bdf8;margin-bottom:8px">localhost:3000 (Next.js)</div>
+      <div style="display:flex;gap:8px">
+        <div style="background:#1e293b;border-radius:4px;padding:8px;flex:1;font-size:11px">
+          <div style="color:#818cf8">shadcn/ui</div>
+          <div style="color:#475569;margin-top:4px">Charts · Cards · Timeline</div>
+        </div>
+        <div style="background:#1e293b;border-radius:4px;padding:8px;flex:1;font-size:11px">
+          <div style="color:#34d399">API routes</div>
+          <div style="color:#475569;margin-top:4px">Read/write Obsidian .md</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;color:#475569;font-size:10px">↕ Obsidian ← file sync → Next.js API → Vercel (optional deploy)</div>
+    </div>
+    <div class="card-body">
+      <h3>B — New Next.js + shadcn app (local + Vercel)</h3>
+      <p>Standalone web app. Local Next.js dev server reads/writes Obsidian files via API routes. shadcn charts for visuals. Deploy to Vercel for access from phone/anywhere.</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Pros</h4><ul><li>Full shadcn component library</li><li>Rich charts (Recharts/Tremor)</li><li>Access from any device</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Separate from ResearchOS</li><li>Vercel can't read local files (need local API)</li><li>More setup</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a2e;padding:18px;border-radius:6px;font-family:monospace;font-size:12px;color:#e8d5b7;">
+      <div style="color:#f7c59f;margin-bottom:8px">Obsidian (native)</div>
+      <div style="display:flex;gap:8px">
+        <div style="background:#16213e;border-radius:4px;padding:8px;flex:1;font-size:11px">
+          <div style="color:#0f3460">📋 Bases</div>
+          <div style="color:#6c6c6c;margin-top:4px">Habit tables</div>
+        </div>
+        <div style="background:#16213e;border-radius:4px;padding:8px;flex:1;font-size:11px">
+          <div style="color:#e94560">🖼 Canvas</div>
+          <div style="color:#6c6c6c;margin-top:4px">Visual boards</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;color:#6c6c6c;font-size:10px">↕ No external app — all in Obsidian vault already</div>
+    </div>
+    <div class="card-body">
+      <h3>C — Obsidian-native (Bases + Canvas + Templates)</h3>
+      <p>Everything lives in your vault. Bases tables for habit data, Canvas boards for visual timelines, templates for daily bullet journal. Zero extra apps.</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Pros</h4><ul><li>Already where your data is</li><li>No sync needed — IS Obsidian</li><li>Works offline, no servers</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Limited chart types</li><li>No automated compound tracking</li><li>Can't integrate w/ ResearchOS easily</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+</div>
