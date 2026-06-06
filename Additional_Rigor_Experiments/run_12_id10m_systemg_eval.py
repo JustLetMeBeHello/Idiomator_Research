@@ -114,9 +114,32 @@ def main():
         else:
             print(f'\n[{lang}] Running inference on {len(lang_examples)} examples...')
 
-            dataset = BIODataset(lang_examples, tokenizer, args.max_len)
-            loader  = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
+            # Split: literal (span=None) handled outside model, idiomatic through BIODataset
+            literal_examples   = [e for e in lang_examples if e.get('span_start') is None]
+            idiomatic_examples = [e for e in lang_examples if e.get('span_start') is not None]
+            print(f'  idiomatic={len(idiomatic_examples)}  literal={len(literal_examples)}')
+
             preds_out = []
+
+            # Literal examples: predict all-O (no span to find)
+            for ex in literal_examples:
+                enc = tokenizer(ex['sentence'], max_length=args.max_len,
+                                truncation=True, return_offsets_mapping=True)
+                n_real = sum(1 for t in enc['input_ids'] if t not in
+                             [tokenizer.cls_token_id, tokenizer.sep_token_id, tokenizer.pad_token_id])
+                preds_out.append({
+                    **ex,
+                    'pred_span_start':  None,
+                    'pred_span_end':    None,
+                    'pred_span_text':   '',
+                    'pred_bio_tags':    ['O'] * n_real,
+                    'span_exact_match': False,
+                    'span_overlap_f1':  0.0,
+                })
+
+            # Idiomatic examples: run through model
+            dataset = BIODataset(idiomatic_examples, tokenizer, args.max_len)
+            loader  = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
 
             with torch.no_grad():
                 for batch_idx, batch in enumerate(loader):
