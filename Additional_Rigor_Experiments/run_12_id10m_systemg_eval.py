@@ -32,7 +32,7 @@ from sklearn.metrics import f1_score, classification_report
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'Ablations'))
 from BiO_Task_mBERT_train import (
-    load_split, load_best_model,
+    load_split, load_best_model, argmax_or_viterbi,
     decode_bio_to_char_span, compute_overlap_f1,
     ID2LABEL, IGNORE_IDX, get_device,
 )
@@ -166,7 +166,7 @@ def main():
                         batch['attention_mask'].to(device),
                         batch['token_type_ids'].to(device),
                     )
-                    preds = torch.argmax(logits, dim=-1).cpu()
+                    preds = argmax_or_viterbi(model, logits, batch['attention_mask'].to(device))
 
                     batch_start = batch_idx * args.batch_size
                     for i in range(len(preds)):

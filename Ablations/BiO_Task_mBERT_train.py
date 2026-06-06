@@ -54,6 +54,12 @@ except ImportError:
     WANDB = False
     print("wandb not installed — skipping. pip install wandb to enable.")
 
+try:
+    from torchcrf import CRF
+    TORCHCRF = True
+except ImportError:
+    TORCHCRF = False
+
 
 
 # ── BIO label scheme ──────────────────────────────────────────────────────────
@@ -85,6 +91,8 @@ def parse_args():
                    help='Loss weight for O class (B/I are weighted 1.0). '
                         'Lower values focus training on span tokens.')
     p.add_argument('--use_wandb',     action='store_true')
+    p.add_argument('--use_crf',       action='store_true',
+                   help='Add CRF layer (Viterbi decode, enforces valid B/I/O transitions).')
     p.add_argument('--device',        default=None)
     return p.parse_args()
 
@@ -308,6 +316,48 @@ class BIOTagger(torch.nn.Module):
         return logits
 
 
+# ── CRF model ────────────────────────────────────────────────────────────────
+
+class BIOTaggerCRF(torch.nn.Module):
+    """mBERT + linear head + CRF. Viterbi decode enforces valid B/I/O transitions."""
+
+    def __init__(self, model_name, num_labels=NUM_LABELS, dropout=0.1):
+        super().__init__()
+        if not TORCHCRF:
+            raise ImportError("pytorch-crf not installed. Run: pip install pytorch-crf")
+        self.bert     = AutoModel.from_pretrained(model_name)
+        hidden_size   = self.bert.config.hidden_size
+        self.dropout  = torch.nn.Dropout(dropout)
+        self.head     = torch.nn.Linear(hidden_size, num_labels)
+        self.crf      = CRF(num_labels, batch_first=True)
+
+    def forward(self, input_ids, attention_mask, token_type_ids):
+        outputs   = self.bert(input_ids=input_ids, attention_mask=attention_mask,
+                              token_type_ids=token_type_ids)
+        seq_out   = self.dropout(outputs.last_hidden_state.float())
+        emissions = self.head(seq_out)
+        return emissions
+
+    def crf_loss(self, emissions, tags, mask):
+        return -self.crf(emissions, tags, mask=mask, reduction='mean')
+
+    def decode(self, emissions, mask):
+        return self.crf.decode(emissions, mask=mask)
+
+
+def argmax_or_viterbi(model, logits, attention_mask):
+    """Returns [B, T] tensor. Viterbi if CRF model, argmax otherwise."""
+    if isinstance(model, BIOTaggerCRF):
+        mask    = attention_mask.bool()
+        decoded = model.decode(logits, mask)
+        T       = logits.shape[1]
+        out     = torch.zeros(logits.shape[0], T, dtype=torch.long)
+        for i, seq in enumerate(decoded):
+            out[i, :len(seq)] = torch.tensor(seq, dtype=torch.long)
+        return out.cpu()
+    return torch.argmax(logits, dim=-1).cpu()
+
+
 # ── Span decoding ─────────────────────────────────────────────────────────────
 
 def decode_bio_to_char_span(bio_preds, encoding, sentence, max_len):
@@ -421,8 +471,8 @@ def evaluate(model, loader, tokenizer, examples, device, split_name, max_len):
             token_type_ids = batch['token_type_ids'].to(device)
             bio_labels     = batch['bio_labels']          # [B, T], CPU
 
-            logits = model(input_ids, attention_mask, token_type_ids)  # [B, T, 3]
-            preds  = torch.argmax(logits, dim=-1).cpu()                # [B, T]
+            logits = model(input_ids, attention_mask, token_type_ids)
+            preds  = argmax_or_viterbi(model, logits, attention_mask)
 
             batch_start = batch_idx * loader.batch_size
             for i in range(len(preds)):
@@ -503,14 +553,20 @@ def save_model(model, tokenizer, output_dir):
     print(f"  Saved encoder ({sum(p.stat().st_size for p in weight_files)/1e6:.1f} MB) + head + tokenizer")
     tokenizer.save_pretrained(best)
     torch.save(model.head.state_dict(), best / 'bio_head.pt')
+    if isinstance(model, BIOTaggerCRF):
+        torch.save(model.crf.state_dict(), best / 'crf_state.pt')
 
 
 def load_best_model(model_name, output_dir, device):
     best = Path(output_dir) / 'best_model'
     if not best.exists():
-        print(f"  ⚠ best_model/ not found (dev never improved). "
-              f"Loading base {model_name} for compatibility test eval.")
+        print(f"  ⚠ best_model/ not found. Loading base {model_name}.")
         model = BIOTagger(model_name)
+    elif (best / 'crf_state.pt').exists():
+        model = BIOTaggerCRF(str(best))
+        model.head.load_state_dict(torch.load(best / 'bio_head.pt',  map_location=device, weights_only=True))
+        model.crf.load_state_dict( torch.load(best / 'crf_state.pt', map_location=device, weights_only=True))
+        print(f"  Loaded BIOTaggerCRF from {best}")
     else:
         model = BIOTagger(str(best))
         model.head.load_state_dict(torch.load(best / 'bio_head.pt', map_location=device, weights_only=True))
@@ -553,16 +609,20 @@ def train(args):
     dev_loader   = DataLoader(dev_ds,   batch_size=args.batch_size)
     test_loader  = DataLoader(test_ds,  batch_size=args.batch_size)
 
-    model = BIOTagger(args.model_name).to(device)
-
-    # Class weights: downweight O so the model focuses on B/I tokens.
-    # reduction='none' so we can additionally scale by per-example language weight.
-    class_weights = torch.tensor(
-        [args.o_weight, 1.0, 1.0], dtype=torch.float
-    ).to(device)
-    criterion = torch.nn.CrossEntropyLoss(
-        weight=class_weights, ignore_index=IGNORE_IDX, reduction='none'
-    )
+    if args.use_crf:
+        if not TORCHCRF:
+            raise ImportError("--use_crf requires pytorch-crf: pip install pytorch-crf")
+        model     = BIOTaggerCRF(args.model_name, dropout=args.dropout).to(device)
+        criterion = None
+        print("CRF mode: Viterbi decode, NLL loss (o_weight not used)")
+    else:
+        model = BIOTagger(args.model_name, dropout=args.dropout).to(device)
+        class_weights = torch.tensor(
+            [args.o_weight, 1.0, 1.0], dtype=torch.float
+        ).to(device)
+        criterion = torch.nn.CrossEntropyLoss(
+            weight=class_weights, ignore_index=IGNORE_IDX, reduction='none'
+        )
 
     optimizer    = AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
     total_steps  = len(train_loader) * args.epochs
@@ -590,17 +650,18 @@ def train(args):
 
             logits = model(input_ids, attention_mask, token_type_ids)  # [B, T, 3]
 
-            # Per-token loss: [B*T]
-            token_loss = criterion(logits.view(-1, NUM_LABELS), bio_labels.view(-1))
-
-            # Reshape to [B, T], then average over non-ignored tokens per example
-            token_loss = token_loss.view(bio_labels.shape[0], -1)       # [B, T]
-            valid_mask = (bio_labels != IGNORE_IDX).float()              # [B, T]
-            denom      = valid_mask.sum(dim=1).clamp(min=1)              # [B]
-            per_example_loss = (token_loss * valid_mask).sum(dim=1) / denom  # [B]
-
-            # Scale by language cell weights and average over batch
-            loss = (per_example_loss * example_weights).mean()
+            if args.use_crf:
+                crf_mask           = (bio_labels != IGNORE_IDX)
+                labels_clamped     = bio_labels.clone()
+                labels_clamped[~crf_mask] = 0
+                loss = model.crf_loss(logits, labels_clamped, crf_mask)
+            else:
+                token_loss = criterion(logits.view(-1, NUM_LABELS), bio_labels.view(-1))
+                token_loss = token_loss.view(bio_labels.shape[0], -1)
+                valid_mask = (bio_labels != IGNORE_IDX).float()
+                denom      = valid_mask.sum(dim=1).clamp(min=1)
+                per_example_loss = (token_loss * valid_mask).sum(dim=1) / denom
+                loss = (per_example_loss * example_weights).mean()
 
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -654,7 +715,7 @@ def train(args):
             token_type_ids = batch['token_type_ids'].to(device)
 
             logits = best_model(input_ids, attention_mask, token_type_ids)
-            preds  = torch.argmax(logits, dim=-1).cpu()
+            preds  = argmax_or_viterbi(best_model, logits, attention_mask)
 
             batch_start = batch_idx * test_loader.batch_size
             for i in range(len(preds)):
