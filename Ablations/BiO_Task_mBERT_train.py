@@ -339,6 +339,12 @@ class BIOTaggerCRF(torch.nn.Module):
         return emissions
 
     def crf_loss(self, emissions, tags, mask):
+        # CRF requires mask[:, 0] all True — [CLS] is IGNORE_IDX so it's masked off.
+        # Force first timestep on with label O (harmless: [CLS] never a span token).
+        mask = mask.clone()
+        mask[:, 0] = True
+        tags = tags.clone()
+        tags[:, 0] = 0  # O
         return -self.crf(emissions, tags, mask=mask, reduction='mean')
 
     def decode(self, emissions, mask):
