@@ -55,6 +55,7 @@ except ImportError:
     print("wandb not installed — skipping. pip install wandb to enable.")
 
 
+
 # ── BIO label scheme ──────────────────────────────────────────────────────────
 
 LABEL2ID = {'O': 0, 'B-IDIOM': 1, 'I-IDIOM': 2}
@@ -507,9 +508,6 @@ def save_model(model, tokenizer, output_dir):
 def load_best_model(model_name, output_dir, device):
     best = Path(output_dir) / 'best_model'
     if not best.exists():
-        # No checkpoint was saved — dev overlap never improved above 0.
-        # Happens in short dry-runs (1 epoch). Fall back to the base HF model
-        # so test-eval can run and confirm code compatibility.
         print(f"  ⚠ best_model/ not found (dev never improved). "
               f"Loading base {model_name} for compatibility test eval.")
         model = BIOTagger(model_name)

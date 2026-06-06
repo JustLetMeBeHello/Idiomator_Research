@@ -32,10 +32,48 @@ from sklearn.metrics import f1_score, classification_report
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'Ablations'))
 from BiO_Task_mBERT_train import (
-    load_split, BIODataset, load_best_model,
+    load_split, load_best_model,
     decode_bio_to_char_span, compute_overlap_f1,
     ID2LABEL, IGNORE_IDX, get_device,
 )
+from torch.utils.data import Dataset
+from transformers import AutoTokenizer
+
+
+class InferenceDataset(Dataset):
+    """Tokenize-only dataset — no span alignment needed. Handles all examples including literal."""
+
+    def __init__(self, examples, tokenizer, max_len):
+        self.examples = examples
+        self.input_ids       = []
+        self.attention_masks = []
+        self.token_type_ids  = []
+
+        for ex in examples:
+            enc = tokenizer(
+                ex['sentence'],
+                max_length=max_len,
+                padding='max_length',
+                truncation=True,
+                return_tensors='pt',
+            )
+            seq_len = enc['input_ids'].shape[1]
+            tid = enc.get('token_type_ids')
+            self.input_ids.append(enc['input_ids'].squeeze(0))
+            self.attention_masks.append(enc['attention_mask'].squeeze(0))
+            self.token_type_ids.append(
+                tid.squeeze(0) if tid is not None
+                else torch.zeros(seq_len, dtype=torch.long)
+            )
+
+    def __len__(self): return len(self.examples)
+
+    def __getitem__(self, idx):
+        return {
+            'input_ids':      self.input_ids[idx],
+            'attention_mask': self.attention_masks[idx],
+            'token_type_ids': self.token_type_ids[idx],
+        }
 
 TAG2ID   = {'O': 0, 'B-IDIOM': 1, 'I-IDIOM': 2}
 LABEL2ID = {'literal': 0, 'idiomatic': 1}
@@ -91,8 +129,10 @@ def main():
     print(f'Data   : {args.data_dir}')
     print(f'Output : {out_dir}')
 
-    tokenizer = AutoTokenizer.from_pretrained('bert-base-multilingual-cased')
-    model     = load_best_model('bert-base-multilingual-cased', args.model_dir, device)
+    tokenizer = AutoTokenizer.from_pretrained(
+        str(Path(args.model_dir) / 'best_model')
+    )
+    model = load_best_model('bert-base-multilingual-cased', args.model_dir, device)
     model.eval()
 
     # Load ID10M test examples (JSONL from id10m_to_jsonl.py)
@@ -114,32 +154,10 @@ def main():
         else:
             print(f'\n[{lang}] Running inference on {len(lang_examples)} examples...')
 
-            # Split: literal (span=None) handled outside model, idiomatic through BIODataset
-            literal_examples   = [e for e in lang_examples if e.get('span_start') is None]
-            idiomatic_examples = [e for e in lang_examples if e.get('span_start') is not None]
-            print(f'  idiomatic={len(idiomatic_examples)}  literal={len(literal_examples)}')
-
-            preds_out = []
-
-            # Literal examples: predict all-O (no span to find)
-            for ex in literal_examples:
-                enc = tokenizer(ex['sentence'], max_length=args.max_len,
-                                truncation=True, return_offsets_mapping=True)
-                n_real = sum(1 for t in enc['input_ids'] if t not in
-                             [tokenizer.cls_token_id, tokenizer.sep_token_id, tokenizer.pad_token_id])
-                preds_out.append({
-                    **ex,
-                    'pred_span_start':  None,
-                    'pred_span_end':    None,
-                    'pred_span_text':   '',
-                    'pred_bio_tags':    ['O'] * n_real,
-                    'span_exact_match': False,
-                    'span_overlap_f1':  0.0,
-                })
-
-            # Idiomatic examples: run through model
-            dataset = BIODataset(idiomatic_examples, tokenizer, args.max_len)
+            # All examples (literal + idiomatic) through model — no all-O shortcut
+            dataset = InferenceDataset(lang_examples, tokenizer, args.max_len)
             loader  = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
+            preds_out = []
 
             with torch.no_grad():
                 for batch_idx, batch in enumerate(loader):
@@ -153,9 +171,9 @@ def main():
                     batch_start = batch_idx * args.batch_size
                     for i in range(len(preds)):
                         ex_idx = batch_start + i
-                        if ex_idx >= len(dataset.valid_examples):
+                        if ex_idx >= len(dataset.examples):
                             break
-                        ex       = dataset.valid_examples[ex_idx]
+                        ex       = dataset.examples[ex_idx]
                         sentence = ex['sentence']
 
                         enc = tokenizer(
