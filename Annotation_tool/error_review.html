@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Error Analysis Review — Table 9</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:      #0f0f10; --surface:  #18181b; --surface2: #222226;
+    --border:  #2e2e34; --accent:   #6ee7b7; --accent2:  #f59e0b;
+    --danger:  #f87171; --warn:     #fbbf24; --blue:     #93c5fd;
+    --purple:  #c4b5fd; --text:     #e4e4e7; --muted:    #71717a;
+    --keep:    #6ee7b7; --drop:     #f87171;
+  }
+  body { background:var(--bg); color:var(--text); font-family:'IBM Plex Sans',sans-serif;
+         font-size:15px; min-height:100vh; display:flex; flex-direction:column; }
+
+  /* ── Topbar ── */
+  .topbar { background:var(--surface); border-bottom:1px solid var(--border);
+            padding:10px 28px; display:flex; align-items:center; gap:16px;
+            position:sticky; top:0; z-index:100; }
+  .logo { font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:500;
+          color:var(--accent); white-space:nowrap; }
+  .progress-wrap { flex:1; display:flex; align-items:center; gap:10px; }
+  .progress-bar { flex:1; height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+  .progress-fill { height:100%; background:var(--accent); border-radius:2px; transition:width .3s; }
+  .progress-label { font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--muted); white-space:nowrap; }
+  .export-btn { padding:6px 14px; border-radius:6px; border:1px solid var(--accent);
+                background:transparent; color:var(--accent); font-size:13px; cursor:pointer;
+                font-family:'IBM Plex Sans',sans-serif; }
+  .export-btn:hover { background:rgba(110,231,183,.1); }
+
+  /* ── Category nav ── */
+  .cat-nav { display:flex; gap:6px; padding:12px 28px; border-bottom:1px solid var(--border);
+             background:var(--surface); flex-wrap:wrap; }
+  .cat-pill { padding:4px 10px; border-radius:999px; border:1px solid var(--border);
+              font-family:'IBM Plex Mono',monospace; font-size:11px; cursor:pointer;
+              color:var(--muted); transition:all .15s; }
+  .cat-pill:hover { border-color:var(--accent); color:var(--accent); }
+  .cat-pill.active { background:var(--accent); color:#000; border-color:var(--accent); }
+  .cat-pill .kept { font-size:10px; margin-left:4px; opacity:.7; }
+
+  /* ── Main layout ── */
+  .main { flex:1; display:flex; justify-content:center; padding:28px 16px; }
+  .card-wrap { width:100%; max-width:780px; display:flex; flex-direction:column; gap:16px; }
+
+  /* ── Card ── */
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:10px;
+          overflow:hidden; }
+  .card-header { display:flex; align-items:center; gap:10px; padding:12px 18px;
+                 border-bottom:1px solid var(--border); background:var(--surface2); }
+  .badge { padding:3px 8px; border-radius:5px; font-family:'IBM Plex Mono',monospace;
+           font-size:11px; font-weight:500; }
+  .badge-cat  { background:rgba(196,181,253,.15); color:var(--purple); }
+  .badge-sys  { background:rgba(147,197,253,.12); color:var(--blue); }
+  .badge-lang { background:rgba(251,191,36,.12);  color:var(--warn); }
+  .card-num { font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--muted);
+              margin-left:auto; }
+  .card-body { padding:18px; display:flex; flex-direction:column; gap:14px; }
+
+  /* ── Sentence display ── */
+  .sentence-box { background:var(--surface2); border-radius:8px; padding:14px 16px;
+                  font-size:15px; line-height:1.65; border:1px solid var(--border); }
+  .sentence-box strong { color:var(--accent2); font-weight:600; }
+
+  /* ── Meta row ── */
+  .meta-row { display:flex; gap:16px; flex-wrap:wrap; font-size:13px; }
+  .meta-item { display:flex; gap:5px; align-items:center; }
+  .meta-label { color:var(--muted); }
+  .meta-val { font-family:'IBM Plex Mono',monospace; }
+  .gold-idio { color:var(--keep); }
+  .gold-lite { color:var(--blue); }
+  .pred-wrong { color:var(--danger); }
+  .ovlp-high { color:var(--warn); }
+
+  /* ── Span row ── */
+  .span-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:13px; }
+  .span-cell { background:var(--surface2); border-radius:6px; padding:8px 10px;
+               border:1px solid var(--border); }
+  .span-cell .slabel { color:var(--muted); font-size:11px; margin-bottom:3px; }
+  .span-cell .sval { font-family:'IBM Plex Mono',monospace; word-break:break-word; }
+
+  /* ── Edit fields ── */
+  .field-group { display:flex; flex-direction:column; gap:5px; }
+  .field-label { font-size:12px; color:var(--muted); font-family:'IBM Plex Mono',monospace; }
+  textarea, input[type=text], select {
+    background:var(--surface2); border:1px solid var(--border); color:var(--text);
+    border-radius:6px; padding:8px 10px; font-size:13px; width:100%;
+    font-family:'IBM Plex Sans',sans-serif; resize:vertical; outline:none; }
+  textarea:focus, input[type=text]:focus, select:focus { border-color:var(--accent); }
+  select { resize:none; }
+
+  /* ── Actions ── */
+  .actions { display:flex; gap:10px; align-items:center; }
+  .btn { padding:9px 20px; border-radius:7px; border:none; font-size:14px;
+         font-family:'IBM Plex Sans',sans-serif; cursor:pointer; font-weight:500;
+         transition:opacity .15s; }
+  .btn:hover { opacity:.85; }
+  .btn-drop { background:rgba(248,113,113,.15); color:var(--drop); border:1px solid rgba(248,113,113,.3); }
+  .btn-keep { background:rgba(110,231,183,.15); color:var(--keep); border:1px solid rgba(110,231,183,.3); }
+  .btn-nav  { background:var(--surface2); color:var(--text); border:1px solid var(--border); }
+  .btn-nav:disabled { opacity:.3; cursor:default; }
+  .kbd { font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--muted);
+         border:1px solid var(--border); border-radius:3px; padding:1px 4px; margin-left:3px; }
+  .spacer { flex:1; }
+  .decision-stamp { font-family:'IBM Plex Mono',monospace; font-size:11px; padding:4px 8px;
+                    border-radius:4px; }
+  .stamp-keep { background:rgba(110,231,183,.15); color:var(--keep); }
+  .stamp-drop { background:rgba(248,113,113,.15); color:var(--drop); }
+
+  /* ── Summary ── */
+  .summary { background:var(--surface); border:1px solid var(--border); border-radius:10px;
+             padding:14px 18px; }
+  .summary-title { font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--muted);
+                   margin-bottom:10px; }
+  .summary-grid { display:flex; gap:10px; flex-wrap:wrap; }
+  .summary-cell { background:var(--surface2); border-radius:6px; padding:6px 12px;
+                  border:1px solid var(--border); text-align:center; min-width:60px; }
+  .summary-cell .scat { font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--purple); }
+  .summary-cell .scnt { font-size:16px; font-weight:600; margin-top:1px; }
+
+  /* ── Empty / loading ── */
+  .empty { text-align:center; padding:60px 0; color:var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+  <span class="logo">ERROR REVIEW // TABLE 9</span>
+  <div class="progress-wrap">
+    <div class="progress-bar"><div class="progress-fill" id="pBar" style="width:0%"></div></div>
+    <span class="progress-label" id="pLabel">0 / 0 reviewed</span>
+  </div>
+  <button class="export-btn" onclick="exportTable()">Export Table 9</button>
+</div>
+
+<!-- Category nav -->
+<div class="cat-nav" id="catNav"></div>
+
+<!-- Main -->
+<div class="main">
+  <div class="card-wrap">
+    <div id="cardArea"><div class="empty">Loading candidates…</div></div>
+    <div class="summary" id="summary" style="display:none">
+      <div class="summary-title">KEPT BY CATEGORY</div>
+      <div class="summary-grid" id="summaryGrid"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CATS = ['FN-I','FP-L','SB','SM','SC','CL','AM'];
+const CAT_DEFS = {
+  'FN-I':'Idiomatic → literal (false negative)',
+  'FP-L':'Literal → idiomatic (false positive)',
+  'SB':  'Span boundary off',
+  'SM':  'Span missed entirely',
+  'SC':  'Sense confusion (candidate)',
+  'CL':  'Cross-lingual transfer error',
+  'AM':  'Ambiguous gold (candidate)',
+};
+
+let candidates = [];
+let decisions  = {};   // row_num (string) → decision object
+let filtered   = [];   // current view
+let idx        = 0;    // current position in filtered
+let activeCat  = 'ALL';
+
+// ── Load ──────────────────────────────────────────────────────────────────────
+async function load() {
+  const res = await fetch('/api/error-candidates');
+  const data = await res.json();
+  candidates = data.candidates;
+  decisions  = data.decisions || {};
+  buildCatNav();
+  filterBy('ALL');
+}
+
+// ── Category nav ──────────────────────────────────────────────────────────────
+function buildCatNav() {
+  const nav = document.getElementById('catNav');
+  nav.innerHTML = '';
+  const allPill = pill('ALL', 'ALL');
+  nav.appendChild(allPill);
+  for (const cat of CATS) {
+    nav.appendChild(pill(cat, cat));
+  }
+  updateCatNav();
+}
+
+function pill(cat, label) {
+  const el = document.createElement('div');
+  el.className = 'cat-pill' + (cat === activeCat ? ' active' : '');
+  el.dataset.cat = cat;
+  el.innerHTML = label + '<span class="kept" id="keptBadge_' + cat + '"></span>';
+  el.onclick = () => filterBy(cat);
+  return el;
+}
+
+function updateCatNav() {
+  const keptByCat = {};
+  for (const d of Object.values(decisions)) {
+    if (d.decision === 'keep') keptByCat[d.category] = (keptByCat[d.category]||0)+1;
+  }
+  let totalKept = 0;
+  for (const cat of CATS) {
+    const k = keptByCat[cat] || 0;
+    totalKept += k;
+    const badge = document.getElementById('keptBadge_' + cat);
+    if (badge) badge.textContent = k ? `(${k})` : '';
+  }
+  const allBadge = document.getElementById('keptBadge_ALL');
+  if (allBadge) allBadge.textContent = totalKept ? `(${totalKept})` : '';
+
+  document.querySelectorAll('.cat-pill').forEach(p => {
+    p.classList.toggle('active', p.dataset.cat === activeCat);
+  });
+}
+
+// ── Filter ────────────────────────────────────────────────────────────────────
+function filterBy(cat) {
+  activeCat = cat;
+  filtered = cat === 'ALL' ? [...candidates]
+           : candidates.filter(c => c.cat === cat);
+  idx = 0;
+  updateCatNav();
+  render();
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render() {
+  updateProgress();
+  updateSummary();
+  if (!filtered.length) {
+    document.getElementById('cardArea').innerHTML = '<div class="empty">No candidates in this category.</div>';
+    return;
+  }
+  if (idx >= filtered.length) idx = filtered.length - 1;
+  const row = filtered[idx];
+  const key = String(row.row_num);
+  const dec = decisions[key];
+
+  const sentDisplay = dec ? dec.sentence_display : boldIdiom(row.sentence, row.gold_span);
+  const notesVal   = dec ? dec.notes : (row.notes || '');
+  const catVal     = dec ? dec.category : row.cat;
+
+  document.getElementById('cardArea').innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <span class="badge badge-cat" title="${CAT_DEFS[row.cat]||''}">${row.cat}</span>
+        <span class="badge badge-sys">Sys ${row.sys}</span>
+        <span class="badge badge-lang">${row.lang}</span>
+        ${dec ? `<span class="decision-stamp stamp-${dec.decision}">${dec.decision.toUpperCase()}</span>` : ''}
+        <span class="card-num">#${idx+1} / ${filtered.length}${activeCat!=='ALL'?' in '+activeCat:''}</span>
+      </div>
+      <div class="card-body">
+
+        <div class="sentence-box" id="sentBox">${renderSent(row.sentence, row.gold_span)}</div>
+
+        <div class="meta-row">
+          <div class="meta-item">
+            <span class="meta-label">gold</span>
+            <span class="meta-val ${row.gold==='idiomatic'?'gold-idio':'gold-lite'}">${row.gold}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">pred</span>
+            <span class="meta-val ${row.pred!==row.gold?'pred-wrong':''}">${row.pred||'?'}</span>
+          </div>
+          ${row.span_overlap_f1 ? `<div class="meta-item">
+            <span class="meta-label">overlap</span>
+            <span class="meta-val ${row.span_overlap_f1<0.5?'pred-wrong':row.span_overlap_f1<1?'ovlp-high':''}">${row.span_overlap_f1.toFixed(2)}</span>
+          </div>` : ''}
+          ${row.sense_number && row.sense_number > 1 ? `<div class="meta-item">
+            <span class="meta-label">sense</span>
+            <span class="meta-val">${row.sense_number}</span>
+          </div>` : ''}
+          <div class="meta-item">
+            <span class="meta-label">idiom</span>
+            <span class="meta-val" style="color:var(--accent2)">${row.idiom||''}</span>
+          </div>
+        </div>
+
+        <div class="span-row">
+          <div class="span-cell">
+            <div class="slabel">GOLD SPAN</div>
+            <div class="sval">${esc(row.gold_span||'—')}</div>
+          </div>
+          <div class="span-cell">
+            <div class="slabel">PRED SPAN</div>
+            <div class="sval ${row.pred_span&&row.pred_span!==row.gold_span?'pred-wrong':''}">${esc(row.pred_span||'—')}</div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">SENTENCE FOR TABLE (edit: bold with **…**, shorten with …)</div>
+          <textarea id="sentEdit" rows="2">${esc(sentDisplay)}</textarea>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="field-group">
+            <div class="field-label">NOTES</div>
+            <input type="text" id="notesEdit" value="${esc(notesVal)}">
+          </div>
+          <div class="field-group">
+            <div class="field-label">CATEGORY</div>
+            <select id="catEdit">${CATS.map(c=>`<option value="${c}"${c===catVal?' selected':''}>${c} — ${CAT_DEFS[c]}</option>`).join('')}</select>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn btn-nav" id="btnPrev" onclick="nav(-1)" ${idx===0?'disabled':''}>← Prev</button>
+          <button class="btn btn-drop" onclick="decide('drop')">✗ Drop <span class="kbd">D</span></button>
+          <button class="btn btn-keep" onclick="decide('keep')">✓ Keep <span class="kbd">K</span></button>
+          <span class="spacer"></span>
+          <button class="btn btn-nav" id="btnNext" onclick="nav(1)" ${idx===filtered.length-1?'disabled':''}>Next →</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function boldIdiom(sentence, goldSpan) {
+  if (!goldSpan || !sentence) return sentence || '';
+  const i = sentence.indexOf(goldSpan);
+  if (i < 0) return sentence;
+  return sentence.slice(0, i) + '**' + goldSpan + '**' + sentence.slice(i + goldSpan.length);
+}
+
+function renderSent(sentence, goldSpan) {
+  if (!sentence) return '';
+  // Bold **...** spans and escape the rest
+  const text = boldIdiom(sentence, goldSpan);
+  return text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+             .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+             .replace(/<strong>/g,'<strong>').replace(/<\/strong>/g,'</strong>');
+}
+
+function renderSent2(text) {
+  if (!text) return '';
+  return esc(text).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Decide ────────────────────────────────────────────────────────────────────
+async function decide(decision) {
+  const row = filtered[idx];
+  const sentEdit = document.getElementById('sentEdit');
+  const notesEdit = document.getElementById('notesEdit');
+  const catEdit   = document.getElementById('catEdit');
+  if (!sentEdit) return;
+
+  const payload = {
+    row_num: row.row_num,
+    decision,
+    sentence_display: sentEdit.value,
+    notes: notesEdit.value,
+    category: catEdit.value,
+  };
+
+  await fetch('/api/error-decision', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(payload),
+  });
+
+  decisions[String(row.row_num)] = payload;
+  updateCatNav();
+  updateProgress();
+  updateSummary();
+
+  // Advance to next undecided (or just next)
+  const nextUndecided = findNextUndecided(idx + 1);
+  idx = nextUndecided !== -1 ? nextUndecided : Math.min(idx + 1, filtered.length - 1);
+  render();
+}
+
+function findNextUndecided(from) {
+  for (let i = from; i < filtered.length; i++) {
+    if (!decisions[String(filtered[i].row_num)]) return i;
+  }
+  return -1;
+}
+
+function nav(dir) {
+  idx = Math.max(0, Math.min(filtered.length - 1, idx + dir));
+  render();
+}
+
+// ── Progress ──────────────────────────────────────────────────────────────────
+function updateProgress() {
+  const total    = filtered.length;
+  const reviewed = filtered.filter(r => decisions[String(r.row_num)]).length;
+  const kept     = filtered.filter(r => decisions[String(r.row_num)]?.decision === 'keep').length;
+  const pct      = total ? (reviewed / total * 100) : 0;
+  document.getElementById('pBar').style.width = pct + '%';
+  document.getElementById('pLabel').textContent =
+    `${reviewed}/${total} reviewed · ${kept} kept`;
+}
+
+function updateSummary() {
+  const grid = document.getElementById('summaryGrid');
+  const summary = document.getElementById('summary');
+  const keptByCat = {};
+  for (const d of Object.values(decisions)) {
+    if (d.decision === 'keep') keptByCat[d.category] = (keptByCat[d.category]||0)+1;
+  }
+  const total = Object.values(keptByCat).reduce((a,b)=>a+b,0);
+  if (!total) { summary.style.display = 'none'; return; }
+  summary.style.display = '';
+  grid.innerHTML = CATS.map(cat => `
+    <div class="summary-cell">
+      <div class="scat">${cat}</div>
+      <div class="scnt" style="color:${(keptByCat[cat]||0)>=3?'var(--keep)':keptByCat[cat]?'var(--warn)':'var(--muted)'}">${keptByCat[cat]||0}</div>
+    </div>`).join('') +
+    `<div class="summary-cell">
+      <div class="scat">TOTAL</div>
+      <div class="scnt" style="color:${total>=20?'var(--keep)':'var(--warn)'}">${total}</div>
+    </div>`;
+}
+
+// ── Export ────────────────────────────────────────────────────────────────────
+async function exportTable() {
+  const res = await fetch('/api/error-export');
+  if (!res.ok) { alert('No kept rows yet.'); return; }
+  const blob = await res.blob();
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'table9_error_analysis.md';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+  if (e.key === 'k' || e.key === 'K') decide('keep');
+  if (e.key === 'd' || e.key === 'D') decide('drop');
+  if (e.key === 'ArrowRight') nav(1);
+  if (e.key === 'ArrowLeft')  nav(-1);
+});
+
+load();
+</script>
+</body>
+</html>

@@ -314,3 +314,82 @@ def save_annotation(annotation: Annotation):
         raise HTTPException(500, str(e))
     finally:
         db.close()
+
+
+# ── Error Review endpoints (Table 9 §9 error analysis) ─────────────────────────
+
+CANDIDATES_PATH = HERE.parent / "Additional_Rigor_Experiments/results/error_analysis_candidates.jsonl"
+DECISIONS_PATH  = HERE.parent / "Additional_Rigor_Experiments/results/error_review_decisions.json"
+
+
+class ErrorDecision(BaseModel):
+    row_num:          int
+    decision:         str          # "keep" | "drop"
+    sentence_display: str          # potentially edited by reviewer
+    notes:            str
+    category:         str          # possibly overridden
+
+
+@app.get("/error-review")
+def serve_error_review():
+    html_path = HERE / "error_review.html"
+    if not html_path.exists():
+        raise HTTPException(404, "error_review.html not found")
+    return FileResponse(html_path, media_type="text/html")
+
+
+@app.get("/api/error-candidates")
+def get_error_candidates():
+    if not CANDIDATES_PATH.exists():
+        raise HTTPException(404, f"Candidates file not found: {CANDIDATES_PATH}")
+    rows = [_json.loads(l) for l in CANDIDATES_PATH.read_text(encoding="utf-8").splitlines() if l.strip()]
+    decisions = {}
+    if DECISIONS_PATH.exists():
+        decisions = _json.loads(DECISIONS_PATH.read_text(encoding="utf-8"))
+    return {"candidates": rows, "decisions": decisions}
+
+
+@app.post("/api/error-decision")
+def save_error_decision(dec: ErrorDecision):
+    decisions: dict = {}
+    if DECISIONS_PATH.exists():
+        decisions = _json.loads(DECISIONS_PATH.read_text(encoding="utf-8"))
+    decisions[str(dec.row_num)] = dec.model_dump()
+    DECISIONS_PATH.write_text(_json.dumps(decisions, indent=2, ensure_ascii=False), encoding="utf-8")
+    # Verify write
+    saved = _json.loads(DECISIONS_PATH.read_text(encoding="utf-8"))
+    if str(dec.row_num) not in saved:
+        raise HTTPException(500, "Write verification failed")
+    return {"status": "saved", "row_num": dec.row_num}
+
+
+@app.get("/api/error-export")
+def export_error_table():
+    if not DECISIONS_PATH.exists():
+        raise HTTPException(404, "No decisions saved yet")
+    decisions = _json.loads(DECISIONS_PATH.read_text(encoding="utf-8"))
+    kept = [v for v in decisions.values() if v.get("decision") == "keep"]
+    kept.sort(key=lambda x: x.get("row_num", 0))
+
+    CAT_ORDER = ["FN-I", "FP-L", "SB", "SM", "SC", "CL", "AM"]
+    kept.sort(key=lambda x: (CAT_ORDER.index(x["category"]) if x["category"] in CAT_ORDER else 99,
+                              x.get("row_num", 0)))
+
+    lines = [
+        "| **#** | **Lang** | **Sentence (idiom in bold)** | **Sys** | **Gold** | **Pred** | **Cat** | **Notes** |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for i, row in enumerate(kept, 1):
+        sent = row.get("sentence_display", "").replace("|", "\\|")
+        lines.append(
+            f"| {i} | {row.get('lang','?')[:2]} | {sent} | {row.get('sys','?')} "
+            f"| {row.get('gold','?')[:4]} | {row.get('pred','?')[:4]} "
+            f"| {row.get('category','?')} | {row.get('notes','').replace('|','\\|')} |"
+        )
+
+    md = "\n".join(lines)
+    return StreamingResponse(
+        io.StringIO(md),
+        media_type="text/plain",
+        headers={"Content-Disposition": 'attachment; filename="table9_error_analysis.md"'},
+    )
