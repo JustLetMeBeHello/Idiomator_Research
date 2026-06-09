@@ -27,11 +27,30 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-mkdir -p models/rigor_joint_muril_full
+MODEL_DIR="rigor_joint_muril_full"
+
+# ── Persistence gate (CLAUDE.md hard rule) ──────────────────────────────────
+# Set DRIVE_OUT=/content/drive/MyDrive/IdiomatorRigor when running on Colab.
+if [[ -n "${DRIVE_OUT:-}" ]]; then
+    mkdir -p "$DRIVE_OUT/$MODEL_DIR"
+    rm -rf "models/$MODEL_DIR"
+    ln -s "$DRIVE_OUT/$MODEL_DIR" "models/$MODEL_DIR"
+    python - "$DRIVE_OUT" "$MODEL_DIR" <<'PY'
+import os, sys
+drive = os.path.realpath(sys.argv[1])
+for name in sys.argv[2:]:
+    p = os.path.join("models", name)
+    assert os.path.islink(p), f"{p} is not a symlink — output would be ephemeral"
+    assert os.path.isdir(p), f"{p} symlink target missing on Drive"
+    print(f"  ✓ {p} -> {os.path.realpath(p)}")
+PY
+else
+    mkdir -p "models/$MODEL_DIR"
+fi
 
 python Train_Join.py \
     --model_name google/muril-base-cased \
-    --output_dir models/rigor_joint_muril_full \
+    --output_dir "models/$MODEL_DIR" \
     --langs English Spanish Hindi Telugu \
     --test_langs English Spanish Hindi Telugu Indonesian \
     --epochs 7 \
