@@ -91,6 +91,10 @@ def parse_args():
                    help='Stage 2 4-shot GPT predictions (pred_span_start/end keys)')
     p.add_argument('--single_gpt4shot', default='models/gpt_single_4shot/test_predictions.jsonl',
                    help='Single-stage 4-shot GPT predictions (pred_label key)')
+    # ── Encoder-swap rigor systems (XLM-R, MuRIL) — seed 42 by default ────────
+    p.add_argument('--xlmr_joint_preds',  default='flip-2/xlmr_joint_s42/test_predictions.jsonl')
+    p.add_argument('--xlmr_bio_preds',    default='flip-2/xlmr_bio_s42/test_predictions.jsonl')
+    p.add_argument('--muril_joint_preds', default='flip-2/muril_joint_s42/test_predictions.jsonl')
     return p.parse_args()
 
 
@@ -1011,6 +1015,38 @@ def evaluate_system_g(bio_preds, n_bootstrap=10000):
     }
 
 
+# ── Encoder-swap rigor systems ────────────────────────────────────────────────
+
+def evaluate_xlmr_joint(joint_preds, n_bootstrap=10000):
+    print("\n" + "="*60)
+    print("Rigor: XLM-R Joint (encoder swap — seed 42)")
+    print("="*60)
+    if not joint_preds:
+        print("  ✗ Missing — pass --xlmr_joint_preds")
+        return None
+    return evaluate_system_e(joint_preds, n_bootstrap=n_bootstrap)
+
+
+def evaluate_xlmr_bio(bio_preds, n_bootstrap=10000):
+    print("\n" + "="*60)
+    print("Rigor: XLM-R BIO (encoder swap — seed 42)")
+    print("="*60)
+    if not bio_preds:
+        print("  ✗ Missing — pass --xlmr_bio_preds")
+        return None
+    return evaluate_system_g(bio_preds, n_bootstrap=n_bootstrap)
+
+
+def evaluate_muril_joint(joint_preds, n_bootstrap=10000):
+    print("\n" + "="*60)
+    print("Rigor: MuRIL Joint (encoder swap — seed 42)")
+    print("="*60)
+    if not joint_preds:
+        print("  ✗ Missing — pass --muril_joint_preds")
+        return None
+    return evaluate_system_e(joint_preds, n_bootstrap=n_bootstrap)
+
+
 # ── System B4: GPT-4o 4-shot Stage 1 → GPT-4o 4-shot Stage 2 ────────────────
 
 def evaluate_system_b4(s1_gpt4, s2_gpt4, n_bootstrap=10000):
@@ -1353,6 +1389,9 @@ def main():
     s1_gpt4     = load_preds(args.stage1_gpt4shot)
     s2_gpt4     = load_preds(args.stage2_gpt4shot)
     single_gpt4 = load_preds(args.single_gpt4shot)
+    xlmr_joint  = load_preds(args.xlmr_joint_preds)
+    xlmr_bio    = load_preds(args.xlmr_bio_preds)
+    muril_joint = load_preds(args.muril_joint_preds)
 
     print(f"  Stage 1 mBERT    : {len(s1_mbert)} predictions")
     print(f"  Stage 2 mBERT    : {len(s2_mbert)} predictions")
@@ -1367,6 +1406,9 @@ def main():
     print(f"  Stage 1 GPT 4-shot : {len(s1_gpt4)} predictions")
     print(f"  Stage 2 GPT 4-shot : {len(s2_gpt4)} predictions")
     print(f"  Single GPT 4-shot  : {len(single_gpt4)} predictions")
+    print(f"  XLM-R Joint        : {len(xlmr_joint)} predictions")
+    print(f"  XLM-R BIO          : {len(xlmr_bio)} predictions")
+    print(f"  MuRIL Joint        : {len(muril_joint)} predictions")
     print(f"  Bootstrap resamples: {args.n_bootstrap}")
 
     # Build common set from all non-empty prediction dicts
@@ -1396,6 +1438,11 @@ def main():
 
     print(f"  After filtering: {len(s1_mbert)} examples per system\n")
 
+    # Rigor encoder-swap systems: filter to same common set (evaluated independently)
+    xlmr_joint  = filt(xlmr_joint)
+    xlmr_bio    = filt(xlmr_bio)
+    muril_joint = filt(muril_joint)
+
     nb = args.n_bootstrap
     results_a  = evaluate_system_a(s1_mbert, s2_mbert, n_bootstrap=nb)
     results_b  = evaluate_system_b(s1_gpt, s2_gpt, n_bootstrap=nb)
@@ -1406,6 +1453,9 @@ def main():
     results_g  = evaluate_system_g(bio_preds, n_bootstrap=nb)
     results_b4 = evaluate_system_b4(s1_gpt4, s2_gpt4, n_bootstrap=nb)
     results_c4 = evaluate_system_c4(single_gpt4, n_bootstrap=nb)
+    results_xlmr_joint  = evaluate_xlmr_joint(xlmr_joint,  n_bootstrap=nb)
+    results_xlmr_bio    = evaluate_xlmr_bio(xlmr_bio,      n_bootstrap=nb)
+    results_muril_joint = evaluate_muril_joint(muril_joint, n_bootstrap=nb)
 
     print_summary(results_a, results_b, results_c, results_d,
                   results_e, results_f, results_g,
@@ -1421,6 +1471,9 @@ def main():
         'system_e_joint_end_to_end':      results_e,
         'system_f_sequential_phase1_ph2': results_f,
         'system_g_bio_tagger':            results_g,
+        'rigor_xlmr_joint_s42':           results_xlmr_joint,
+        'rigor_xlmr_bio_s42':             results_xlmr_bio,
+        'rigor_muril_joint_s42':          results_muril_joint,
     }
     out_path = output_dir / 'pipeline_eval_results.json'
     json.dump(all_results, open(out_path, 'w'), indent=2, default=str)
