@@ -1468,7 +1468,9 @@ def main():
                   results_e, results_f, results_g,
                   results_b4=results_b4, results_c4=results_c4)
 
-    all_results = {
+    out_path = output_dir / 'pipeline_eval_results.json'
+    all_results = json.loads(out_path.read_text()) if out_path.exists() else {}
+    all_results.update({
         'system_a_mbert_pipeline':        results_a,
         'system_b_gpt_pipeline':          results_b,
         'system_b4_gpt_pipeline_4shot':   results_b4,
@@ -1481,8 +1483,7 @@ def main():
         f'rigor_xlmr_joint_s{args.xlmr_seed}': results_xlmr_joint,
         f'rigor_xlmr_bio_s{args.xlmr_seed}':   results_xlmr_bio,
         'rigor_muril_joint_s42':          results_muril_joint,
-    }
-    out_path = output_dir / 'pipeline_eval_results.json'
+    })
     json.dump(all_results, open(out_path, 'w'), indent=2, default=str)
     print(f"\nFull results saved → {out_path}")
 
