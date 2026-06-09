@@ -91,9 +91,13 @@ def parse_args():
                    help='Stage 2 4-shot GPT predictions (pred_span_start/end keys)')
     p.add_argument('--single_gpt4shot', default='models/gpt_single_4shot/test_predictions.jsonl',
                    help='Single-stage 4-shot GPT predictions (pred_label key)')
-    # ── Encoder-swap rigor systems (XLM-R, MuRIL) — seed 42 by default ────────
-    p.add_argument('--xlmr_joint_preds',  default='flip-2/xlmr_joint_s42/test_predictions.jsonl')
-    p.add_argument('--xlmr_bio_preds',    default='flip-2/xlmr_bio_s42/test_predictions.jsonl')
+    # ── Encoder-swap rigor systems (XLM-R, MuRIL) ───────────────────────────
+    p.add_argument('--xlmr_seed', default='42',
+                   help='Seed suffix for XLM-R result keys and default pred paths (42/123/7)')
+    p.add_argument('--xlmr_joint_preds',  default=None,
+                   help='Override XLM-R joint preds path (default: models/rigor_xlmr_joint_s{seed}/test_predictions.jsonl)')
+    p.add_argument('--xlmr_bio_preds',    default=None,
+                   help='Override XLM-R BIO preds path (default: models/rigor_bio_xlmr_s{seed}/test_predictions.jsonl)')
     p.add_argument('--muril_joint_preds', default='flip-2/muril_joint_s42/test_predictions.jsonl')
     return p.parse_args()
 
@@ -1389,8 +1393,11 @@ def main():
     s1_gpt4     = load_preds(args.stage1_gpt4shot)
     s2_gpt4     = load_preds(args.stage2_gpt4shot)
     single_gpt4 = load_preds(args.single_gpt4shot)
-    xlmr_joint  = load_preds(args.xlmr_joint_preds)
-    xlmr_bio    = load_preds(args.xlmr_bio_preds)
+    s = args.xlmr_seed
+    xlmr_joint_path = args.xlmr_joint_preds or f'models/rigor_xlmr_joint_s{s}/test_predictions.jsonl'
+    xlmr_bio_path   = args.xlmr_bio_preds   or f'models/rigor_bio_xlmr_s{s}/test_predictions.jsonl'
+    xlmr_joint  = load_preds(xlmr_joint_path)
+    xlmr_bio    = load_preds(xlmr_bio_path)
     muril_joint = load_preds(args.muril_joint_preds)
 
     print(f"  Stage 1 mBERT    : {len(s1_mbert)} predictions")
@@ -1471,8 +1478,8 @@ def main():
         'system_e_joint_end_to_end':      results_e,
         'system_f_sequential_phase1_ph2': results_f,
         'system_g_bio_tagger':            results_g,
-        'rigor_xlmr_joint_s42':           results_xlmr_joint,
-        'rigor_xlmr_bio_s42':             results_xlmr_bio,
+        f'rigor_xlmr_joint_s{args.xlmr_seed}': results_xlmr_joint,
+        f'rigor_xlmr_bio_s{args.xlmr_seed}':   results_xlmr_bio,
         'rigor_muril_joint_s42':          results_muril_joint,
     }
     out_path = output_dir / 'pipeline_eval_results.json'
