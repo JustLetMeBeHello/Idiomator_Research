@@ -32,22 +32,30 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Seed: default 42; override with SEED=123 or SEED=7 for multi-seed canonical runs.
+# Seed 42 is already canonical (rigor_xlmr_joint_s42 in pipeline_eval_results.json).
+# Run seeds 123 and 7 with:
+#   SEED=123 DRIVE_OUT=... bash run_02_xlmr_qa_vs_bio.sh
+#   SEED=7   DRIVE_OUT=... bash run_02_xlmr_qa_vs_bio.sh
+SEED="${SEED:-42}"
+JOINT_DIR="rigor_xlmr_joint_s${SEED}"
+BIO_DIR="rigor_bio_xlmr_s${SEED}"
+
 # ── Persistence gate (CLAUDE.md hard rule) ──────────────────────────────────
 # /content is ephemeral on Colab; only Drive survives a disconnect. Set
 # DRIVE_OUT to a mounted-Drive path to force rigor outputs through to Drive
 # via symlink, then HARD-FAIL before training if the link is not actually
 # Drive-backed and writable. Leave DRIVE_OUT unset only for local runs.
 if [[ -n "${DRIVE_OUT:-}" ]]; then
-    for name in rigor_joint_xlmr_full rigor_bio_xlmr_full; do
+    for name in "$JOINT_DIR" "$BIO_DIR"; do
         mkdir -p "$DRIVE_OUT/$name"
-        rm -rf "models/$name"            # drop stale local dir/link
+        rm -rf "models/$name"
         ln -s "$DRIVE_OUT/$name" "models/$name"
     done
-    # Gate: islink + target-under-Drive + write/readback proof, else exit 1.
-    python - "$DRIVE_OUT" <<'PY'
+    python - "$DRIVE_OUT" "$JOINT_DIR" "$BIO_DIR" <<'PY'
 import os, sys
 drive = os.path.realpath(sys.argv[1])
-for name in ("rigor_joint_xlmr_full", "rigor_bio_xlmr_full"):
+for name in sys.argv[2:]:
     p = os.path.join("models", name)
     assert os.path.islink(p), f"{p} is not a symlink — output would be ephemeral"
     tgt = os.path.realpath(p)
@@ -60,14 +68,14 @@ print("✓ persistence gate passed — rigor outputs are Drive-backed and writab
 PY
 else
     echo "⚠ DRIVE_OUT unset — outputs go to local models/ (OK locally; EPHEMERAL on Colab)"
-    mkdir -p models/rigor_joint_xlmr_full models/rigor_bio_xlmr_full
+    mkdir -p "models/$JOINT_DIR" "models/$BIO_DIR"
 fi
 
 echo
-echo "── A) System E + XLM-R (Joint) ────────────────────────────────────────"
+echo "── A) System E + XLM-R (Joint) seed=${SEED} ──────────────────────────"
 python Train_Join.py \
     --model_name xlm-roberta-base \
-    --output_dir models/rigor_joint_xlmr_full \
+    --output_dir "models/$JOINT_DIR" \
     --langs English Spanish Hindi Telugu \
     --test_langs English Spanish Hindi Telugu Indonesian \
     --epochs 7 \
@@ -75,24 +83,26 @@ python Train_Join.py \
     --lr 1e-5 \
     --cls_loss_weight 0.3 \
     --span_loss_weight 1.9 \
-    --seed 42
+    --seed "$SEED"
 
 echo
-echo "── B) System G + XLM-R (BIO) ──────────────────────────────────────────"
+echo "── B) System G + XLM-R (BIO) seed=${SEED} ────────────────────────────"
 python Ablations/BiO_Task_mBERT_train.py \
     --model_name xlm-roberta-base \
-    --output_dir models/rigor_bio_xlmr_full \
+    --output_dir "models/$BIO_DIR" \
     --langs English Spanish Hindi Telugu \
     --test_langs English Spanish Hindi Telugu Indonesian \
     --epochs 6 \
     --batch_size 32 \
     --lr 3.27e-5 \
     --o_weight 0.104 \
-    --seed 42
+    --seed "$SEED"
 
 echo
-echo "── Experiment 02 complete ─────────────────────────────────────────────"
-echo "mBERT baselines to compare against (computed live, never hardcoded):"
+echo "── Experiment 02 complete (seed=${SEED}) ──────────────────────────────"
+echo "Run Evaluation/Full_evaluation.py pointing at models/$JOINT_DIR and"
+echo "models/$BIO_DIR to produce canonical rows for pipeline_eval_results.json."
+echo "mBERT baselines (computed live):"
 python Additional_Rigor_Experiments/mbert_baselines.py || \
     echo "  (run Evaluation/Full_evaluation.py to populate the results json)"
 echo
