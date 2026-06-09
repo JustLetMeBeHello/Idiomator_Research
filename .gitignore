@@ -15,6 +15,10 @@ __pycache__/
 # Data backups
 *.bak
 
+# Prediction data files — large, untracked by design
+flip-2/
+ID10m/*.jsonl
+
 # OS
 .DS_Store
 
