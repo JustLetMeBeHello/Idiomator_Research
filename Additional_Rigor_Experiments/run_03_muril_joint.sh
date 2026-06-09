@@ -56,9 +56,13 @@ python Train_Join.py \
     --epochs 7 \
     --batch_size 32 \
     --lr 2e-5 \
-    --cls_loss_weight 0.3 \
+    --cls_loss_weight 0.5 \
     --span_loss_weight 1.9 \
     --seed 42
+# NOTE: cls_loss_weight raised 0.3→0.5 for MuRIL. At 0.3 the cls head never
+# escapes random-coin-flip (stuck at ln(2)=0.693 all 7 epochs) because the
+# span gradient dominates. All other HP identical to System E mBERT.
+# Paper footnote: "MuRIL required cls_loss_weight=0.5 to achieve cls convergence."
 
 echo
 echo "── Experiment 03 complete ─────────────────────────────────────────────"

@@ -1,0 +1,24 @@
+{
+  "model": "google/muril-base-cased",
+  "langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu"
+  ],
+  "test_langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu",
+    "Indonesian"
+  ],
+  "best_epoch": 6,
+  "best_dev_overlap": 0.785928017343593,
+  "test_exact_match": 0.4044,
+  "test_overlap_f1": 0.6286,
+  "train_size": 5081,
+  "dev_size": 631,
+  "test_size": 957,
+  "o_weight": 0.104
+}

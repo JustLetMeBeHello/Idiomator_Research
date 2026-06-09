@@ -1,0 +1,24 @@
+{
+  "model": "xlm-roberta-base",
+  "langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu"
+  ],
+  "test_langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu",
+    "Indonesian"
+  ],
+  "best_epoch": 6,
+  "best_dev_overlap": 0.8729498451043441,
+  "test_exact_match": 0.5456,
+  "test_overlap_f1": 0.824,
+  "train_size": 5077,
+  "dev_size": 630,
+  "test_size": 953,
+  "o_weight": 0.104
+}

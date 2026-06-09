@@ -1,0 +1,28 @@
+{
+  "model_name": "xlm-roberta-base",
+  "data_dir": "idioms_structured/Splits",
+  "dropout": 0.23943117966801888,
+  "output_dir": "/content/drive/MyDrive/IdiomatorRigor/flip/xlmr_bio_s123",
+  "langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu"
+  ],
+  "test_langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu",
+    "Indonesian"
+  ],
+  "epochs": 6,
+  "batch_size": 32,
+  "lr": 3.27e-05,
+  "max_len": 128,
+  "warmup_ratio": 0.096,
+  "seed": 123,
+  "o_weight": 0.104,
+  "use_wandb": false,
+  "device": null
+}

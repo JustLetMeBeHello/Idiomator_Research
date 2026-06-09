@@ -1,0 +1,27 @@
+{
+  "best_dev_cls_f1": 0.33298097251585623,
+  "best_dev_joint_f1": 0.5189414852965231,
+  "best_epoch": 7,
+  "test_cls_macro_f1": 0.32983193277310924,
+  "test_span_exact": 0.4608150470219436,
+  "test_span_overlap": 0.6702921745791515,
+  "model": "google/muril-base-cased",
+  "langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu"
+  ],
+  "test_langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu",
+    "Indonesian"
+  ],
+  "cls_loss_weight": 0.3,
+  "span_loss_weight": 1.9,
+  "train_size": 5082,
+  "dev_size": 631,
+  "test_size": 957
+}
