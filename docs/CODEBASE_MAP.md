@@ -1,6 +1,6 @@
 # CODEBASE_MAP — IdiomBERT / Research_And_Training
 
-> Auto-generated 2026-06-11; rigor runners updated 2026-06-19. Read this before grepping the repo.
+> Auto-generated 2026-06-11; rigor runners updated 2026-06-19; ablation matrix section corrected 2026-06-20. Read this before grepping the repo.
 > Trust it unless it conflicts with something you can see in the actual file.
 > Update touched sections after any session that adds/renames files or functions.
 
@@ -126,20 +126,16 @@ Evaluation/Full_evaluation.py → results/pipeline_eval/pipeline_eval_results.js
 
 ## Language ablation matrix (15 training combos × 7 systems)
 
-### `Google_Colab/run_language_ablation_matrix.py` — ablation orchestrator
-- Runs 15 language-subset combos × {stage1, stage2, joint, sequential, bio} systems
-- Resumable: JSON checkpoint per job; `--force` bypasses stale checkpoints (USE AFTER CODE CHANGES)
-- Key args: `--only_combo en`, `--only_system bio`, `--force`, `--keep_checkpoints`
-- Output: `results/language_ablation_matrix/<combo>/<system>/`
-- **Must run on Colab with GPU** (T4/A100) — symlinks Drive models + results dirs
+**CANONICAL OUTPUT (current, 2026-06-20): `models/results_Full_Pipeline/`** — one `pipeline_eval_results.json` per combo (all 7 systems each), plus `ablation_summary.csv` (1005 rows) / `stability_summary.csv` / `transfer_matrix.csv` rollups, `logs/<combo>__eval.log`, `job_checkpoints/<combo>__eval.json`. Systems A/D/E/F are clean; B/C are correctly static across combos (GPT isn't retrained per combo); **System G has a Telugu-specific collapse (exact=0, overlap 0.27–0.30) in every combo** — root cause found 2026-06-20: `run_bio.py`'s skip-if-output-exists check had no `--force` flag, so a bad early result was silently re-served across all 15 combos (not a decoder bug — that path is shared+patched and confirmed fine). All 5 `Language_Ablations/run_*.py` runners patched with `--force`. **Pending Colab verification** (`run_bio.py --only_combo te --force`) before trusting G's ablation rows. Detail: `memory/ablation_matrix_status.md`.
 
-### `Google_Colab/summarize_language_ablation_matrix.py` — aggregates ablation results
-- Produces: `results/language_ablation_matrix/ablation_summary.csv` + `stability_summary.csv`
+Superseded one earlier generation — moved to `notebooks/colab/_deprecated/` 2026-06-20, confirmed unreferenced by any current script before moving:
+- `run_language_ablation_matrix.py`, `run_language_ablation_matrix.sh`, `fix_system_g_combos.py`, `Fix_System_G.ipynb` — May-29 generation, only ever produced System-G-only results in `g_only/` subdirs (main per-combo json never existed for this generation).
 
-### `Google_Colab/fix_system_g_combos.py` — one-shot System G ablation fix
-- Re-trains System G BIO for all 15 combos with fixed decoder (post-bug-fix)
-- Steps: rm stale sentinels → retrain BIO → eval → patch json → regen CSVs
-- `--skip_retrain` available if only eval step needed
+Current (live) scripts — don't move these without re-checking the call graph:
+- `notebooks/colab/Language_Ablations/run_stage1.py run_stage2.py run_joint.py run_bio.py run_sequential.py run_eval.py` — Jun-19 per-system runners. `run_eval.py` calls `Evaluation/Full_evaluation.py` per combo, then `notebooks/colab/summarize_language_ablation_matrix.py` (the May-29-era summarizer — still live, NOT part of the deprecated set, kept in place) to roll up into `results_Full_Pipeline/`.
+- `notebooks/colab/Language_Ablations/merge_ablations.py` — separate manual utility, not called by `run_eval.py`. Merges partial ablation outputs from multiple Colab accounts (each account does a subset of the 15 combos, downloads its `models/language_ablation_matrix/` tree, this script combines them) — explains why `models/language_ablation_matrix/<combo>/` is only partially populated locally (other accounts' shares not yet merged in here).
+
+**If "where are the ablation results" comes up again: it's `models/results_Full_Pipeline/`, not `results/language_ablation_matrix/` (that path doesn't exist) and not `models/language_ablation_matrix/` (that's raw per-job checkpoints, not the merged eval).**
 
 ---
 

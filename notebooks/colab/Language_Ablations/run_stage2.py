@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -63,6 +64,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--test_langs",   nargs="+", default=ALL_TEST_LANGS)
     p.add_argument("--only_combo",   default=None)
     p.add_argument("--keep_checkpoints", action="store_true")
+    p.add_argument("--force", action="store_true",
+                    help="Retrain even if checkpoint/output already exists. "
+                         "Deletes the stale checkpoint sentinel + output dir first.")
     # Hyperparameters
     p.add_argument("--lr",     default="1e-5")
     p.add_argument("--epochs", default="7")
@@ -137,11 +141,20 @@ def main() -> None:
 
     completed = 0
     for job in tqdm(jobs, desc=f"{SYSTEM} jobs", unit="combo"):
-        if checkpoint_done(args, job) or expected_done(args, job):
+        if not args.force and (checkpoint_done(args, job) or expected_done(args, job)):
             mark_done(args, job)
             tqdm.write(f"✓ skip {job.name}")
             completed += 1
             continue
+
+        if args.force:
+            cp = checkpoint_path(args, job)
+            if cp.exists():
+                cp.unlink()
+            out_dir = Path(args.ablation_dir) / job.combo / "stage2_mbert"
+            if out_dir.exists():
+                shutil.rmtree(out_dir)
+                tqdm.write(f"  force: deleted stale {out_dir}")
 
         out = str(Path(args.ablation_dir) / job.combo / "stage2_mbert")
         cmd = [
