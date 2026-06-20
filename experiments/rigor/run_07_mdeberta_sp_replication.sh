@@ -69,6 +69,7 @@ cd "$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 MODEL="${MODEL:-google/rembert}"
 ENC_SHORT="${ENC_SHORT:-rembert}"
 BATCH="${BATCH:-16}"      # rembert ~576M params; 16 fits T4. (XLM-R matrix used 32.)
+GRAD_ACCUM="${GRAD_ACCUM:-1}"  # gradient accumulation steps; effective batch = BATCH × GRAD_ACCUM
 JOINT="training/Train_Join.py"
 BIO="experiments/ablations/BiO_Task_mBERT_train.py"
 LANGS="English Spanish Hindi Telugu"
@@ -105,7 +106,7 @@ run_joint () {  # $1=outdir  $2=epochs  $3=seed
     python -u "$JOINT" \
         --model_name "$MODEL" --output_dir "$1" \
         --langs $LANGS --test_langs $TEST_LANGS \
-        --epochs "$2" --batch_size "$BATCH" --lr "${LR_JOINT:-3e-6}" \
+        --epochs "$2" --batch_size "$BATCH" --grad_accum_steps "$GRAD_ACCUM" --lr "${LR_JOINT:-3e-6}" \
         --cls_loss_weight 0.3 --span_loss_weight 1.9 --seed "$3" \
         2>&1 | tee -a "$1/console.log"
 }

@@ -48,15 +48,18 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# E1 config — RemBERT, batch 32, RemBERT's own LRs (run_07 defaults LR_JOINT=3e-6
-# / LR_BIO=2e-6 already match; set explicitly so the config is self-documenting).
+# E1 config — RemBERT, effective batch 32 (physical 8 × grad_accum 4), RemBERT's own LRs.
+# RemBERT (~576M params) OOMs on T4 at physical batch 32. Gradient accumulation is
+# mathematically equivalent: gradients summed over 4 physical batches of 8 = one
+# gradient step identical to physical batch 32.  Paper reports effective_batch=32.
 export MODEL="${MODEL:-google/rembert}"
 export ENC_SHORT="${ENC_SHORT:-rembert32}"
-export BATCH="${BATCH:-32}"
+export BATCH="${BATCH:-8}"
+export GRAD_ACCUM="${GRAD_ACCUM:-4}"
 export LR_JOINT="${LR_JOINT:-3e-6}"
 export LR_BIO="${LR_BIO:-2e-6}"
 
-echo "E1 = RemBERT @ batch ${BATCH}, seeds 42/123/7, LR_JOINT=${LR_JOINT} LR_BIO=${LR_BIO}"
+echo "E1 = RemBERT @ effective batch $((BATCH * GRAD_ACCUM)) (physical ${BATCH} × grad_accum ${GRAD_ACCUM}), seeds 42/123/7, LR_JOINT=${LR_JOINT} LR_BIO=${LR_BIO}"
 echo "Delegating to run_07 (persistence gate + per-job skip/resume)..."
 echo
 

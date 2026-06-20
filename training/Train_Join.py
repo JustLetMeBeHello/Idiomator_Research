@@ -87,6 +87,8 @@ def parse_args():
     p.add_argument('--max_len',         type=int,   default=128)
     p.add_argument('--warmup_ratio',    type=float, default=0.05)
     p.add_argument('--seed',            type=int,   default=42)
+    p.add_argument('--grad_accum_steps', type=int, default=1,
+               help='Gradient accumulation steps. Effective batch = batch_size × grad_accum_steps.')
     p.add_argument('--cls_loss_weight', type=float, default=0.3,
                    help='Weight on classification loss term')
     p.add_argument('--span_loss_weight',type=float, default=1.9,
@@ -509,7 +511,8 @@ def train(args):
     span_criterion = torch.nn.CrossEntropyLoss()   # no weighting on span heads
 
     optimizer    = AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
-    total_steps  = len(train_loader) * args.epochs
+    # optimizer steps = ceil(batches_per_epoch / grad_accum_steps) * epochs
+    total_steps  = ((len(train_loader) + args.grad_accum_steps - 1) // args.grad_accum_steps) * args.epochs
     warmup_steps = int(total_steps * args.warmup_ratio)
     scheduler    = get_linear_schedule_with_warmup(optimizer, warmup_steps, total_steps)
 
@@ -525,7 +528,7 @@ def train(args):
         total_loss = 0.0
 
         pbar = tqdm(train_loader, desc=f"Epoch {epoch}/{args.epochs}", unit='batch')
-        for batch in pbar:
+        for batch_idx, batch in enumerate(pbar):
             input_ids       = batch['input_ids'].to(device)
             attention_mask  = batch['attention_mask'].to(device)
             token_type_ids  = batch['token_type_ids'].to(device)
@@ -543,19 +546,19 @@ def train(args):
                 span_criterion(end_logits,   end_positions)
             ) / 2
 
-            loss = args.cls_loss_weight * cls_loss + args.span_loss_weight * span_loss
+            unscaled_loss = args.cls_loss_weight * cls_loss + args.span_loss_weight * span_loss
 
-            if torch.isnan(loss) or torch.isinf(loss):
+            if torch.isnan(unscaled_loss) or torch.isinf(unscaled_loss):
                 # mDeBERTa-v3 disentangled attention can produce NaN/inf in the
                 # span or cls head on the first few batches.  Skip the batch so
                 # the optimizer state stays clean.
                 print(f"  ⚠ NaN/inf loss (cls={cls_loss.item():.4f} "
                       f"span={span_loss.item():.4f}) — skipping batch")
                 optimizer.zero_grad()
-                scheduler.step()
                 continue
 
-            loss.backward()
+            # scale before backward so accumulated gradients equal one full-batch gradient
+            (unscaled_loss / args.grad_accum_steps).backward()
 
             # mDeBERTa-v3 can emit NaN gradients via its position-bias
             # computation even when the forward loss is finite.  Clipping
@@ -569,14 +572,17 @@ def train(args):
             if nan_params:
                 print(f"  ⚠ Sanitised NaN/inf grads in {nan_params} params")
 
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            optimizer.step()
-            scheduler.step()
-            optimizer.zero_grad()
+            is_accum_step = (batch_idx + 1) % args.grad_accum_steps == 0
+            is_last_batch = (batch_idx + 1) == len(train_loader)
+            if is_accum_step or is_last_batch:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                optimizer.step()
+                scheduler.step()
+                optimizer.zero_grad()
 
-            total_loss += loss.item()
+            total_loss += unscaled_loss.item()
             pbar.set_postfix({
-                'loss': f'{loss.item():.4f}',
+                'loss': f'{unscaled_loss.item():.4f}',
                 'cls':  f'{cls_loss.item():.4f}',
                 'span': f'{span_loss.item():.4f}',
             })
