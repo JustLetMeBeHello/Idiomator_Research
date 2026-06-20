@@ -1,6 +1,6 @@
 # CODEBASE_MAP — IdiomBERT / Research_And_Training
 
-> Auto-generated 2026-06-11. Read this before grepping the repo.
+> Auto-generated 2026-06-11; rigor runners updated 2026-06-19. Read this before grepping the repo.
 > Trust it unless it conflicts with something you can see in the actual file.
 > Update touched sections after any session that adds/renames files or functions.
 
@@ -153,11 +153,16 @@ These are numbered experiments adding statistical rigor to paper claims.
 | `run_04_llama3_baseline.py` | Llama-3.3-70B via Groq baseline (no GPU, ~$0.25) | not yet run |
 | `run_05_decoder_rerun.py` | Fixed UTF-8 char-aware decoder rerun (produced System G corrected metrics) | done |
 | `run_06_idiombert_v2.py` | IdiomBERT v2 (planned) | not yet run |
-| `run_08_extended_gold.py` | SP QA>BIO gap under 3 gold normalizations (Scenario A) | DONE, seed-stable (3 seeds: 42/123/7) — confirmed in key_numbers.md |
+| `run_07b_e1_rembert_batch32.sh` | **E1** — RemBERT @ batch 32, 3 seeds; thin wrapper over run_07 (bakes MODEL/ENC_SHORT=rembert32/BATCH=32/LRs); inherits run_07 Drive gate + per-job skip/resume | NEW 2026-06-19; smoke-test passed on Colab |
+| `run_08_extended_gold.py` | SP QA>BIO gap under 3 gold normalizations (Scenario A). `REMBERT_ENC` env override (default `rembert`) repoints the rembert source to E1's `rembert32/` layout; run_08b+run_13 inherit it via import | DONE, seed-stable (42/123/7); REMBERT_ENC added 2026-06-19 |
 | `run_08b_strip_ci.py` | Bootstrap 95% CI on the SP-family strip gap (macro stat); reuses run_08 evaluate_encoder+SOURCES. Fills §7 [FILL] | NEW, unrun (needs preds on Colab) |
 | `run_09_semeval_eval.py` | SemEval benchmark eval | not yet run |
 | `run_10_id10m_eval.py` | ID10M zero-shot eval | done (EN BIO=0.615, ES BIO=0.590) |
 | `run_12_id10m_systemg_eval.py` | ID10M eval specifically for System G | done |
+| `run_13_tost_equivalence.py` | **N1** — TOST equivalence test for C1 (replaces "CI contains reference"); reuses run_08 evaluate_encoder; default Δ=0.02; `--reference wp|zero` | NEW 2026-06-19; unrun (needs Colab preds-root) |
+| `run_14_holm_bh_correction.py` | **N2** — Holm-Bonferroni + BH correction on per-language mBERT-vs-GPT-4o Joint-F1 family (paired bootstrap p); no scipy dep | NEW 2026-06-19; ran on local preds → 0/4 survive correction (single-seed E vs C) |
+| `run_15_multiseed_main_tables.sh` | **E2** — multi-seed (123/7) driver for mBERT A–G tables (Stage_1/Stage_2/Train_Join/Train_Sequential/BiO at default=seed-42 hparams); Drive gate + FORCE=1 + --dry-run | NEW 2026-06-19; dry-run verified, GPU run pending |
+| `run_16_wordpiece_word_tagger.py` | **E3** — WordPiece WORD-level POS-style tagger (mean-pool subwords→word, one B/I/O/word, word-boundary decode); plugs into Full_evaluation via `--bio_preds` | NEW 2026-06-19; smoke-tested locally, GPU run pending |
 | `check_metric_drift.py` | Detects if metrics in json drifted from expected values | run before any paper build |
 | `sample_error_analysis.py` | Sample ~25 error examples for §9 error table | not yet run for paper |
 
