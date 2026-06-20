@@ -1,33 +1,33 @@
 {
   "English": {
-    "sampled_total": 2542,
+    "sampled_total": 2533,
     "unique_idioms": {
-      "train": 7710,
-      "dev": 964,
-      "test": 964
+      "train": 1752,
+      "dev": 209,
+      "test": 207
     },
     "train": {
-      "total": 2034,
-      "idiomatic": 1017,
-      "literal": 1017
+      "total": 2030,
+      "idiomatic": 1014,
+      "literal": 1016
     },
     "dev": {
-      "total": 254,
-      "idiomatic": 127,
+      "total": 252,
+      "idiomatic": 125,
       "literal": 127
     },
     "test": {
-      "total": 254,
-      "idiomatic": 127,
-      "literal": 127
+      "total": 251,
+      "idiomatic": 125,
+      "literal": 126
     }
   },
   "Spanish": {
     "sampled_total": 2542,
     "unique_idioms": {
-      "train": 2548,
-      "dev": 318,
-      "test": 319
+      "train": 1366,
+      "dev": 165,
+      "test": 170
     },
     "train": {
       "total": 2034,
@@ -48,9 +48,9 @@
   "Hindi": {
     "sampled_total": 632,
     "unique_idioms": {
-      "train": 146,
+      "train": 144,
       "dev": 18,
-      "test": 19
+      "test": 18
     },
     "train": {
       "total": 508,
@@ -89,6 +89,19 @@
       "total": 62,
       "idiomatic": 31,
       "literal": 31
+    }
+  },
+  "Indonesian": {
+    "sampled_total": 325,
+    "unique_idioms": {
+      "train": 0,
+      "dev": 0,
+      "test": 46
+    },
+    "test": {
+      "total": 325,
+      "idiomatic": 155,
+      "literal": 170
     }
   }
 }
