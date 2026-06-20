@@ -80,8 +80,18 @@ PUNCT_TRAIL = set(",.;:!?।॥。．！？"   # , . ; : ! ?  । ॥ 。 ．！
 
 # ── Encoder layout — mirrors DeBERTa_SentencePiece_Replication.ipynb cell 16 ────
 #   enc -> (subdir-under-root, name-template, family)
+#
+# The RemBERT source is env-overridable so the C1 strip-gap analysis can be
+# pointed at experiment E1's de-confounded batch-32 RemBERT instead of the
+# original batch-16 run. run_07 with ENC_SHORT=rembert32 writes preds to
+# <root>/rembert32/rembert32_{system}_s{seed}; set REMBERT_ENC=rembert32 to make
+# run_08 / run_08b / run_13 (which import SOURCES) read that layout. The dict KEY
+# stays "rembert" so all downstream labels/verdict logic are unchanged.
+#   REMBERT_ENC=rembert32 python experiments/rigor/run_08_extended_gold.py ...
+import os as _os
+_REMBERT_ENC = _os.environ.get("REMBERT_ENC", "rembert")
 SOURCES = {
-    "rembert": ("rembert", "rembert_{system}_s{seed}", "SentencePiece"),
+    "rembert": (_REMBERT_ENC, _REMBERT_ENC + "_{system}_s{seed}", "SentencePiece"),
     "xlmr":    ("flip",    "xlmr_{system}_s{seed}",    "SentencePiece"),
     "mbert":   ("flip",    "mbert_{system}_s{seed}",   "WordPiece"),
     "muril":   ("flip",    "muril_{system}_s{seed}",   "WordPiece"),
