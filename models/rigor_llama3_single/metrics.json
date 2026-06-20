@@ -1,0 +1,42 @@
+{
+  "provider": "groq",
+  "model": "llama-3.3-70b-versatile",
+  "base_url": "https://api.groq.com/openai/v1",
+  "approach": "single_stage",
+  "test_size": 960,
+  "classification_macro_f1": 0.6741,
+  "span_exact_match": 0.4354,
+  "span_overlap_f1": 0.6224,
+  "cls_per_lang": {
+    "English": 0.7473,
+    "Hindi": 0.5906,
+    "Indonesian": 0.6546,
+    "Spanish": 0.6924,
+    "Telugu": 0.4347
+  },
+  "span_per_lang": {
+    "English": {
+      "exact": 0.4685,
+      "overlap": 0.6906
+    },
+    "Hindi": {
+      "exact": 0.5,
+      "overlap": 0.586
+    },
+    "Indonesian": {
+      "exact": 0.4268,
+      "overlap": 0.5512
+    },
+    "Spanish": {
+      "exact": 0.3976,
+      "overlap": 0.6505
+    },
+    "Telugu": {
+      "exact": 0.4355,
+      "overlap": 0.6413
+    }
+  },
+  "parse_failures": 0,
+  "spans_not_found": 0,
+  "cost_estimate": 0.0
+}

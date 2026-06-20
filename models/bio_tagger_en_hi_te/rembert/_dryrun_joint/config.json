@@ -1,0 +1,22 @@
+{
+  "model_name": "google/rembert",
+  "data_dir": "idioms_structured/Splits",
+  "dropout": 0.1,
+  "output_dir": "/content/drive/MyDrive/IdiomatorRigor/rembert/_dryrun_joint",
+  "langs": [
+    "English"
+  ],
+  "test_langs": [
+    "English"
+  ],
+  "epochs": 1,
+  "batch_size": 8,
+  "lr": 1e-05,
+  "max_len": 128,
+  "warmup_ratio": 0.05,
+  "seed": 42,
+  "cls_loss_weight": 0.3,
+  "span_loss_weight": 1.9,
+  "use_wandb": false,
+  "device": null
+}

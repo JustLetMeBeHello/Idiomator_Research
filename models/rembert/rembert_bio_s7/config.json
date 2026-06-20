@@ -1,0 +1,29 @@
+{
+  "model_name": "google/rembert",
+  "data_dir": "idioms_structured/Splits",
+  "dropout": 0.23943117966801888,
+  "output_dir": "/content/drive/MyDrive/IdiomatorRigor/rembert/rembert_bio_s7",
+  "langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu"
+  ],
+  "test_langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu",
+    "Indonesian"
+  ],
+  "epochs": 6,
+  "batch_size": 16,
+  "lr": 2e-06,
+  "max_len": 128,
+  "warmup_ratio": 0.096,
+  "seed": 7,
+  "o_weight": 0.104,
+  "use_wandb": false,
+  "use_crf": false,
+  "device": null
+}

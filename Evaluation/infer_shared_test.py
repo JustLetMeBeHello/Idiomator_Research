@@ -19,7 +19,7 @@ ID2LABEL  = {0: 'literal', 1: 'idiomatic'}
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument('--test_path',   default='idioms_structured/Splits/test.jsonl')
+    p.add_argument('--test_path',   default='data/idioms_structured/Splits/test.jsonl')
     p.add_argument('--stage1_dir',  default='models/stage1_mbert_en_hi_te')
     p.add_argument('--joint_dir',   default='models/joint_mbert_en_hi_te')
     p.add_argument('--stage2_dir',  default='models/stage2_mbert_en_hi_te') # Added Stage 2 Path

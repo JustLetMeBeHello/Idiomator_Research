@@ -28,3 +28,9 @@ CLAUDE.md
 
 # Claude Code
 .claude/
+.agents/
+
+# Annotation database — binary, per-session churn, contains annotator names
+*.db
+*.db.bak*
+annotations.db*

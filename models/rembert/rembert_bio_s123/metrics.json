@@ -1,0 +1,24 @@
+{
+  "model": "google/rembert",
+  "langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu"
+  ],
+  "test_langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu",
+    "Indonesian"
+  ],
+  "best_epoch": 5,
+  "best_dev_overlap": 0.8147081711498356,
+  "test_exact_match": 0.5615,
+  "test_overlap_f1": 0.8218,
+  "train_size": 5052,
+  "dev_size": 620,
+  "test_size": 951,
+  "o_weight": 0.104
+}

@@ -1,0 +1,358 @@
+{
+  "inventory": {
+    "English": {
+      "lang": "English",
+      "total_records": 23140,
+      "total_idioms": 9638,
+      "multi_sense_idioms": 8567,
+      "idioms_with_dup_sense": 767,
+      "dup_sense_records": 950,
+      "pct_multisense_with_dup": 8.95,
+      "pct_records_duplicated": 4.11,
+      "cross_sense_bleed_sentences": 2475,
+      "cross_sense_bleed_idioms": 769
+    },
+    "Spanish": {
+      "lang": "Spanish",
+      "total_records": 7518,
+      "total_idioms": 3185,
+      "multi_sense_idioms": 2933,
+      "idioms_with_dup_sense": 0,
+      "dup_sense_records": 0,
+      "pct_multisense_with_dup": 0.0,
+      "pct_records_duplicated": 0.0,
+      "cross_sense_bleed_sentences": 0,
+      "cross_sense_bleed_idioms": 0
+    },
+    "Hindi": {
+      "lang": "Hindi",
+      "total_records": 409,
+      "total_idioms": 183,
+      "multi_sense_idioms": 180,
+      "idioms_with_dup_sense": 0,
+      "dup_sense_records": 0,
+      "pct_multisense_with_dup": 0.0,
+      "pct_records_duplicated": 0.0,
+      "cross_sense_bleed_sentences": 0,
+      "cross_sense_bleed_idioms": 0
+    },
+    "Telugu": {
+      "lang": "Telugu",
+      "total_records": 210,
+      "total_idioms": 103,
+      "multi_sense_idioms": 99,
+      "idioms_with_dup_sense": 0,
+      "dup_sense_records": 0,
+      "pct_multisense_with_dup": 0.0,
+      "pct_records_duplicated": 0.0,
+      "cross_sense_bleed_sentences": 0,
+      "cross_sense_bleed_idioms": 0
+    },
+    "Indonesian": {
+      "lang": "Indonesian",
+      "total_records": 95,
+      "total_idioms": 46,
+      "multi_sense_idioms": 44,
+      "idioms_with_dup_sense": 0,
+      "dup_sense_records": 0,
+      "pct_multisense_with_dup": 0.0,
+      "pct_records_duplicated": 0.0,
+      "cross_sense_bleed_sentences": 0,
+      "cross_sense_bleed_idioms": 0
+    }
+  },
+  "splits": {
+    "train": {
+      "English": {
+        "n_rows": 2034,
+        "dup_sense_rows": 86,
+        "dup_sense_idiomatic": 38,
+        "dup_sense_literal": 48,
+        "pct_on_dup_sense": 4.23,
+        "span_flags": {
+          "span_start_none": 0,
+          "span_end_none": 0,
+          "start_ge_end": 0,
+          "end_gt_len_sentence": 0,
+          "start_negative": 0,
+          "matched_span_mismatch": 0
+        },
+        "total_bad_span": 0,
+        "dup_sent_strings": 3,
+        "redundant_rows": 3,
+        "definition_field_absent": true,
+        "missing_definition": 2034,
+        "missing_sense_number": 0,
+        "missing_sentence": 0
+      },
+      "Spanish": {
+        "n_rows": 2034,
+        "dup_sense_rows": 0,
+        "dup_sense_idiomatic": 0,
+        "dup_sense_literal": 0,
+        "pct_on_dup_sense": 0.0,
+        "span_flags": {
+          "span_start_none": 0,
+          "span_end_none": 0,
+          "start_ge_end": 0,
+          "end_gt_len_sentence": 0,
+          "start_negative": 0,
+          "matched_span_mismatch": 0
+        },
+        "total_bad_span": 0,
+        "dup_sent_strings": 0,
+        "redundant_rows": 0,
+        "definition_field_absent": true,
+        "missing_definition": 2034,
+        "missing_sense_number": 0,
+        "missing_sentence": 0
+      },
+      "Hindi": {
+        "n_rows": 508,
+        "dup_sense_rows": 0,
+        "dup_sense_idiomatic": 0,
+        "dup_sense_literal": 0,
+        "pct_on_dup_sense": 0.0,
+        "span_flags": {
+          "span_start_none": 0,
+          "span_end_none": 0,
+          "start_ge_end": 0,
+          "end_gt_len_sentence": 0,
+          "start_negative": 0,
+          "matched_span_mismatch": 0
+        },
+        "total_bad_span": 0,
+        "dup_sent_strings": 0,
+        "redundant_rows": 0,
+        "definition_field_absent": true,
+        "missing_definition": 508,
+        "missing_sense_number": 0,
+        "missing_sentence": 0
+      },
+      "Telugu": {
+        "n_rows": 506,
+        "dup_sense_rows": 0,
+        "dup_sense_idiomatic": 0,
+        "dup_sense_literal": 0,
+        "pct_on_dup_sense": 0.0,
+        "span_flags": {
+          "span_start_none": 0,
+          "span_end_none": 0,
+          "start_ge_end": 0,
+          "end_gt_len_sentence": 0,
+          "start_negative": 0,
+          "matched_span_mismatch": 0
+        },
+        "total_bad_span": 0,
+        "dup_sent_strings": 0,
+        "redundant_rows": 0,
+        "definition_field_absent": true,
+        "missing_definition": 506,
+        "missing_sense_number": 0,
+        "missing_sentence": 0
+      }
+    },
+    "dev": {
+      "English": {
+        "n_rows": 254,
+        "dup_sense_rows": 16,
+        "dup_sense_idiomatic": 7,
+        "dup_sense_literal": 9,
+        "pct_on_dup_sense": 6.3,
+        "span_flags": {
+          "span_start_none": 0,
+          "span_end_none": 0,
+          "start_ge_end": 0,
+          "end_gt_len_sentence": 0,
+          "start_negative": 0,
+          "matched_span_mismatch": 0
+        },
+        "total_bad_span": 0,
+        "dup_sent_strings": 1,
+        "redundant_rows": 1,
+        "definition_field_absent": true,
+        "missing_definition": 254,
+        "missing_sense_number": 0,
+        "missing_sentence": 0
+      },
+      "Spanish": {
+        "n_rows": 254,
+        "dup_sense_rows": 0,
+        "dup_sense_idiomatic": 0,
+        "dup_sense_literal": 0,
+        "pct_on_dup_sense": 0.0,
+        "span_flags": {
+          "span_start_none": 0,
+          "span_end_none": 0,
+          "start_ge_end": 0,
+          "end_gt_len_sentence": 0,
+          "start_negative": 0,
+          "matched_span_mismatch": 0
+        },
+        "total_bad_span": 0,
+        "dup_sent_strings": 0,
+        "redundant_rows": 0,
+        "definition_field_absent": true,
+        "missing_definition": 254,
+        "missing_sense_number": 0,
+        "missing_sentence": 0
+      },
+      "Hindi": {
+        "n_rows": 62,
+        "dup_sense_rows": 0,
+        "dup_sense_idiomatic": 0,
+        "dup_sense_literal": 0,
+        "pct_on_dup_sense": 0.0,
+        "span_flags": {
+          "span_start_none": 0,
+          "span_end_none": 0,
+          "start_ge_end": 0,
+          "end_gt_len_sentence": 0,
+          "start_negative": 0,
+          "matched_span_mismatch": 0
+        },
+        "total_bad_span": 0,
+        "dup_sent_strings": 0,
+        "redundant_rows": 0,
+        "definition_field_absent": true,
+        "missing_definition": 62,
+        "missing_sense_number": 0,
+        "missing_sentence": 0
+      },
+      "Telugu": {
+        "n_rows": 61,
+        "dup_sense_rows": 0,
+        "dup_sense_idiomatic": 0,
+        "dup_sense_literal": 0,
+        "pct_on_dup_sense": 0.0,
+        "span_flags": {
+          "span_start_none": 0,
+          "span_end_none": 0,
+          "start_ge_end": 0,
+          "end_gt_len_sentence": 0,
+          "start_negative": 0,
+          "matched_span_mismatch": 0
+        },
+        "total_bad_span": 0,
+        "dup_sent_strings": 0,
+        "redundant_rows": 0,
+        "definition_field_absent": true,
+        "missing_definition": 61,
+        "missing_sense_number": 0,
+        "missing_sentence": 0
+      }
+    },
+    "test": {
+      "English": {
+        "n_rows": 254,
+        "dup_sense_rows": 15,
+        "dup_sense_idiomatic": 6,
+        "dup_sense_literal": 9,
+        "pct_on_dup_sense": 5.91,
+        "span_flags": {
+          "span_start_none": 0,
+          "span_end_none": 0,
+          "start_ge_end": 0,
+          "end_gt_len_sentence": 0,
+          "start_negative": 0,
+          "matched_span_mismatch": 0
+        },
+        "total_bad_span": 0,
+        "dup_sent_strings": 1,
+        "redundant_rows": 1,
+        "definition_field_absent": true,
+        "missing_definition": 254,
+        "missing_sense_number": 0,
+        "missing_sentence": 0
+      },
+      "Hindi": {
+        "n_rows": 62,
+        "dup_sense_rows": 0,
+        "dup_sense_idiomatic": 0,
+        "dup_sense_literal": 0,
+        "pct_on_dup_sense": 0.0,
+        "span_flags": {
+          "span_start_none": 0,
+          "span_end_none": 0,
+          "start_ge_end": 0,
+          "end_gt_len_sentence": 0,
+          "start_negative": 0,
+          "matched_span_mismatch": 0
+        },
+        "total_bad_span": 0,
+        "dup_sent_strings": 0,
+        "redundant_rows": 0,
+        "definition_field_absent": true,
+        "missing_definition": 62,
+        "missing_sense_number": 0,
+        "missing_sentence": 0
+      },
+      "Spanish": {
+        "n_rows": 254,
+        "dup_sense_rows": 0,
+        "dup_sense_idiomatic": 0,
+        "dup_sense_literal": 0,
+        "pct_on_dup_sense": 0.0,
+        "span_flags": {
+          "span_start_none": 0,
+          "span_end_none": 0,
+          "start_ge_end": 0,
+          "end_gt_len_sentence": 0,
+          "start_negative": 0,
+          "matched_span_mismatch": 0
+        },
+        "total_bad_span": 0,
+        "dup_sent_strings": 0,
+        "redundant_rows": 0,
+        "definition_field_absent": true,
+        "missing_definition": 254,
+        "missing_sense_number": 0,
+        "missing_sentence": 0
+      },
+      "Telugu": {
+        "n_rows": 62,
+        "dup_sense_rows": 0,
+        "dup_sense_idiomatic": 0,
+        "dup_sense_literal": 0,
+        "pct_on_dup_sense": 0.0,
+        "span_flags": {
+          "span_start_none": 0,
+          "span_end_none": 0,
+          "start_ge_end": 0,
+          "end_gt_len_sentence": 0,
+          "start_negative": 0,
+          "matched_span_mismatch": 0
+        },
+        "total_bad_span": 0,
+        "dup_sent_strings": 0,
+        "redundant_rows": 0,
+        "definition_field_absent": true,
+        "missing_definition": 62,
+        "missing_sense_number": 0,
+        "missing_sentence": 0
+      },
+      "Indonesian": {
+        "n_rows": 328,
+        "dup_sense_rows": 0,
+        "dup_sense_idiomatic": 0,
+        "dup_sense_literal": 0,
+        "pct_on_dup_sense": 0.0,
+        "span_flags": {
+          "span_start_none": 3,
+          "span_end_none": 3,
+          "start_ge_end": 0,
+          "end_gt_len_sentence": 0,
+          "start_negative": 0,
+          "matched_span_mismatch": 0
+        },
+        "total_bad_span": 3,
+        "dup_sent_strings": 0,
+        "redundant_rows": 0,
+        "definition_field_absent": true,
+        "missing_definition": 328,
+        "missing_sense_number": 0,
+        "missing_sentence": 0
+      }
+    }
+  }
+}

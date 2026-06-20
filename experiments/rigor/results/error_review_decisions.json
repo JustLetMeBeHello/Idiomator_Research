@@ -1,0 +1,368 @@
+{
+  "2": {
+    "row_num": 2,
+    "decision": "keep",
+    "sentence_display": "She designed the user interface to be **simplicity itself**, so even beginners could navigate it without trouble.",
+    "notes": "The model misidentifies and miscontextualizes the sentence with the user interface to be simplicity itself, while it includes the idiot simplicity itself it doesn't consider those two as related this is a failure where the model isn't able to properly detect simplicity itself as different from the rest of the sentence and understand that it doesn't mean simplicity itself literally.",
+    "category": "FN-I"
+  },
+  "1": {
+    "row_num": 1,
+    "decision": "keep",
+    "sentence_display": "If she **flips her lid** over the broken vase, I’ll have to explain it was an accident.",
+    "notes": "The span overlap is quite similar however we can see the transfer result of the misclassification and it's impact on span with flipping the lid over being a more literal expression than how the idiom flipping one's lid is used",
+    "category": "FN-I"
+  },
+  "4": {
+    "row_num": 4,
+    "decision": "drop",
+    "sentence_display": "Después de una semana estresante, decidí **tomar el sol** y relajarme en el jardín.",
+    "notes": "",
+    "category": "FN-I"
+  },
+  "3": {
+    "row_num": 3,
+    "decision": "keep",
+    "sentence_display": "**Al primer golpe de vista**, la casa parecía abandonada, pero al acercarnos descubrimos que alguien vivía allí.",
+    "notes": "",
+    "category": "FN-I"
+  },
+  "6": {
+    "row_num": 6,
+    "decision": "keep",
+    "sentence_display": "En el mercado había frutas **a tutiplén**, suficientes para abastecer a toda la ciudad.",
+    "notes": "",
+    "category": "FN-I"
+  },
+  "7": {
+    "row_num": 7,
+    "decision": "keep",
+    "sentence_display": "The pressure was **raised as the stakes** became higher in the final round of the championship.",
+    "notes": "It's literal to idiomatic but also it misses the span nearly entirely",
+    "category": "FP-L"
+  },
+  "5": {
+    "row_num": 5,
+    "decision": "keep",
+    "sentence_display": "Did you see that the chess match **tied in** the final round? Neither player could gain the upper hand.",
+    "notes": "",
+    "category": "AM"
+  },
+  "8": {
+    "row_num": 8,
+    "decision": "keep",
+    "sentence_display": "The firefighters spent all night **fighting fires** caused by the dry lightning storm in the forest preserves.",
+    "notes": "The problem with this one is that fighting fires is semantically and compositionally grounded with context in firefighters, however dry lightning storm isn't semantically grounded and slightly odd so it pick the wrong span and misclassifies.",
+    "category": "FP-L"
+  },
+  "9": {
+    "row_num": 9,
+    "decision": "keep",
+    "sentence_display": "No sentí ningún **tilín** en los dedos pese al frío intenso que hacía esa mañana.",
+    "notes": "tilin is just used literally another example of how the zero shot task isn't built for literal span extraction and tillin isn't the idioms but the idiom isn't present in canonical form",
+    "category": "AM"
+  },
+  "10": {
+    "row_num": 10,
+    "decision": "keep",
+    "sentence_display": "Para el experimento, **sacaron lo mejor del** mineral para analizar su composición.",
+    "notes": "This is a misidentification a simple mistake that can be explained by the model being too sensitive to signals",
+    "category": "FP-L"
+  },
+  "26": {
+    "row_num": 26,
+    "decision": "drop",
+    "sentence_display": "They decided to run on more units of the product due to unexpectedly high demand.",
+    "notes": "G SC: model correct (idiom=idiom), imprecise span only",
+    "category": "SC",
+    "lang": "English",
+    "sys": "G",
+    "gold": "idiomatic",
+    "pred": "idiomatic"
+  },
+  "27": {
+    "row_num": 27,
+    "decision": "drop",
+    "sentence_display": "Cuando Juan decidió hacerse a la mar, sabía que enfrentaría muchos desafíos en su viaje.",
+    "notes": "G SC: model correct (idiom=idiom), imprecise span only",
+    "category": "SC",
+    "lang": "Spanish",
+    "sys": "G",
+    "gold": "idiomatic",
+    "pred": "idiomatic"
+  },
+  "28": {
+    "row_num": 28,
+    "decision": "drop",
+    "sentence_display": "Me hace falta mi abuela cuando cocinaba sus recetas tradicionales para toda la familia.",
+    "notes": "G SC: model correct (idiom=idiom), imprecise span only",
+    "category": "SC",
+    "lang": "Spanish",
+    "sys": "G",
+    "gold": "idiomatic",
+    "pred": "idiomatic"
+  },
+  "29": {
+    "row_num": 29,
+    "decision": "drop",
+    "sentence_display": "अगर तुम्हें कभी कोई ईद का चाँद मिले, तो उसकी कद्र करना।",
+    "notes": "G SC: model correct (idiom=idiom), imprecise span only",
+    "category": "SC",
+    "lang": "Hindi",
+    "sys": "G",
+    "gold": "idiomatic",
+    "pred": "idiomatic"
+  },
+  "30": {
+    "row_num": 30,
+    "decision": "drop",
+    "sentence_display": "वह हमेशा जलते घर में हाथ सेंकता रहता है और अपने फायदे के लिए झगड़ों में कूद पड़ता है।",
+    "notes": "G SC: model correct (idiom=idiom), imprecise span only",
+    "category": "SC",
+    "lang": "Hindi",
+    "sys": "G",
+    "gold": "idiomatic",
+    "pred": "idiomatic"
+  },
+  "19": {
+    "row_num": 19,
+    "decision": "drop",
+    "sentence_display": "The detective found more strange clues at the scene and exclaimed, 'This case is getting curiouser and curiouser.'",
+    "notes": "G SM: classification correct, BIO span failure not revealing",
+    "category": "SM",
+    "lang": "English",
+    "sys": "G",
+    "gold": "idiomatic",
+    "pred": "idiomatic"
+  },
+  "20": {
+    "row_num": 20,
+    "decision": "drop",
+    "sentence_display": "If you think you can cheat on the test and get away with it, that's a big fat mistake.",
+    "notes": "G SM: classification correct, BIO span failure not revealing",
+    "category": "SM",
+    "lang": "English",
+    "sys": "G",
+    "gold": "idiomatic",
+    "pred": "idiomatic"
+  },
+  "21": {
+    "row_num": 21,
+    "decision": "drop",
+    "sentence_display": "En la reunión de juego, dejé que Marta ganara la partida para animarla un poco.",
+    "notes": "G SM: classification correct, BIO span failure not revealing",
+    "category": "SM",
+    "lang": "Spanish",
+    "sys": "G",
+    "gold": "idiomatic",
+    "pred": "idiomatic"
+  },
+  "22": {
+    "row_num": 22,
+    "decision": "drop",
+    "sentence_display": "Después de tanto esfuerzo, su éxito está bien empleado y todos lo reconocen.",
+    "notes": "G SM: classification correct, BIO span failure not revealing",
+    "category": "SM",
+    "lang": "Spanish",
+    "sys": "G",
+    "gold": "idiomatic",
+    "pred": "idiomatic"
+  },
+  "24": {
+    "row_num": 24,
+    "decision": "drop",
+    "sentence_display": "माँ ने बच्चे को डांट कर ठिकाने लगा दिया कि वह ध्यान से पढ़ाई करे।",
+    "notes": "G SM: classification correct, BIO span failure not revealing",
+    "category": "SM",
+    "lang": "Hindi",
+    "sys": "G",
+    "gold": "idiomatic",
+    "pred": "idiomatic"
+  },
+  "14": {
+    "row_num": 14,
+    "decision": "drop",
+    "sentence_display": "For your particular benefit, I’ve added detailed instructions to the manual.",
+    "notes": "G SB: classification correct, span boundary only",
+    "category": "SB",
+    "lang": "English",
+    "sys": "G",
+    "gold": "idiomatic",
+    "pred": "idiomatic"
+  },
+  "17": {
+    "row_num": 17,
+    "decision": "drop",
+    "sentence_display": "I know this isn’t my area of expertise, but here’s my two cents on the matter.",
+    "notes": "G SB: classification correct, span boundary only",
+    "category": "SB",
+    "lang": "English",
+    "sys": "G",
+    "gold": "idiomatic",
+    "pred": "idiomatic"
+  },
+  "18": {
+    "row_num": 18,
+    "decision": "drop",
+    "sentence_display": "When the radical group started managing the town council, locals joked that the lunatics had taken over the asylum.",
+    "notes": "G SB: classification correct, span boundary only",
+    "category": "SB",
+    "lang": "English",
+    "sys": "G",
+    "gold": "idiomatic",
+    "pred": "idiomatic"
+  },
+  "11": {
+    "row_num": 11,
+    "decision": "drop",
+    "sentence_display": "मरे बिना स्वर्ग नहीं मिलता, इसलिए हमें अपने कर्म सुधारने चाहिए।",
+    "notes": "G FP-L structural: same idiom repeated, G always predicts span",
+    "category": "FP-L",
+    "lang": "Hindi",
+    "sys": "G",
+    "gold": "literal",
+    "pred": "idiomatic"
+  },
+  "12": {
+    "row_num": 12,
+    "decision": "drop",
+    "sentence_display": "कहा जाता है कि मरे बिना स्वर्ग नहीं मिलता, इसका अर्थ है कि मृत्यु के बाद ही मोक्ष संभव है।",
+    "notes": "G FP-L structural: same idiom repeated, G always predicts span",
+    "category": "FP-L",
+    "lang": "Hindi",
+    "sys": "G",
+    "gold": "literal",
+    "pred": "idiomatic"
+  },
+  "37": {
+    "row_num": 37,
+    "decision": "keep",
+    "sentence_display": "She said she was going round the bend with all the noise from the construction site next door.",
+    "notes": "this is an interesting example but the problem is it's an ambiguous gold but the idiom itself is precarious and we need a standardized base idiom. The model predicts it correctly bt it isn't clear which is better round the bend or going round the bend as an idiom",
+    "category": "AM"
+  },
+  "38": {
+    "row_num": 38,
+    "decision": "keep",
+    "sentence_display": "After working nonstop for six months, Maria finally took some time off to recharge.",
+    "notes": "AM: span boundary ambiguity, no IAA table to anchor in paper",
+    "category": "AM"
+  },
+  "39": {
+    "row_num": 39,
+    "decision": "keep",
+    "sentence_display": "Por más que intentó no asomar las narices en la reunión, finalmente lo vieron llegar.",
+    "notes": "asomar las narices is the idiom however the model classifies the idiom",
+    "category": "SB"
+  },
+  "40": {
+    "row_num": 40,
+    "decision": "keep",
+    "sentence_display": "El salario de Ana va a la par con su experiencia y responsabilidades.",
+    "notes": "AM: span boundary ambiguity, no IAA table to anchor in paper",
+    "category": "AM"
+  },
+  "41": {
+    "row_num": 41,
+    "decision": "drop",
+    "sentence_display": "Si te campaneas mucho, terminarás con problemas en la escuela.",
+    "notes": "AM: span boundary ambiguity, no IAA table to anchor in paper",
+    "category": "AM",
+    "lang": "Spanish",
+    "sys": "G",
+    "gold": "idiomatic",
+    "pred": "idiomatic"
+  },
+  "42": {
+    "row_num": 42,
+    "decision": "drop",
+    "sentence_display": "Nosotros vamos a la par en el proyecto, así que debemos coordinarnos para no atrasarnos.",
+    "notes": "AM: span boundary ambiguity, no IAA table to anchor in paper",
+    "category": "AM",
+    "lang": "Spanish",
+    "sys": "E",
+    "gold": "idiomatic",
+    "pred": "idiomatic"
+  },
+  "13": {
+    "row_num": 13,
+    "decision": "keep",
+    "sentence_display": "When the radical group started managing the town council, locals joked that the **lunatics had taken over the asylum**.",
+    "notes": "The idiom itself is quite long and very unlike what the model had seen before in many cases this might be even considered literal",
+    "category": "SB"
+  },
+  "15": {
+    "row_num": 15,
+    "decision": "keep",
+    "sentence_display": "La abuela guarda las joyas de la familia **a buen recaudo** en un lugar secreto.",
+    "notes": "It seems there was confusion in the model and it over - extended the span but the only part of the sentence that should've been picked up due to the  non-morphologically similar context is a buen recaudo.",
+    "category": "SB"
+  },
+  "16": {
+    "row_num": 16,
+    "decision": "keep",
+    "sentence_display": "Si hubiéramos escuchado a Leonardo, que era **adelantado a su época**, la tecnología estaría mucho más avanzada ahora.",
+    "notes": "It picks up the adelantado a su época however it also signals the context as bas as well, it classifies It correctly though.",
+    "category": "SB"
+  },
+  "23": {
+    "row_num": 23,
+    "decision": "keep",
+    "sentence_display": "काम पूरा हो गया, **फिर से** बात ये है कि उसे समय पर करना जरूरी था।",
+    "notes": "This seems to be a hindi specific error as it misidentified the two word idiom as one word somewhere else this is because of Hindi's peculiar problem in figurative language for mBERT",
+    "category": "CL"
+  },
+  "25": {
+    "row_num": 25,
+    "decision": "keep",
+    "sentence_display": "Managers should encourage teams to **make haste slowly** to balance efficiency and accuracy.",
+    "notes": "make haste slowly is the correct idiom and generated slowly however it could be offshored into make haste which the model identifies this is actually correct and a limitation of our training data.",
+    "category": "SC"
+  },
+  "31": {
+    "row_num": 31,
+    "decision": "keep",
+    "sentence_display": "बच्चों ने **घड़ियाली आँसू** देखकर उसकी पीड़ा महसूस की।",
+    "notes": "GPT-4o (Sys C): correct span घड़ियाली आँसू, misclassified literal as idiomatic",
+    "category": "FP-L"
+  },
+  "32": {
+    "row_num": 32,
+    "decision": "keep",
+    "sentence_display": "धार्मिक ग्रंथ कहते हैं कि **मरे बिना स्वर्ग नहीं मिलता**।",
+    "notes": "GPT-4o (Sys C): correct span मरे बिना..., misclassified literal as idiomatic",
+    "category": "FP-L"
+  },
+  "33": {
+    "row_num": 33,
+    "decision": "keep",
+    "sentence_display": "**చాపక్రిందినీరు** చాలా శుభ్రమైనది, అందరూ ఆశ్చర్యపోయారు.",
+    "notes": "GPT-4o (Sys C): correct span చాపక్రిందినీరు, misclassified literal as idiomatic",
+    "category": "FP-L"
+  },
+  "35": {
+    "row_num": 35,
+    "decision": "keep",
+    "sentence_display": "రామ్ ఎప్పటికీ **చంకనాకిపోతోందని** నాకు అనిపిస్తుంది, కానీ అతను ఎందుకు అలా మాట్లాడాడో అర్థం కాలేదు.",
+    "notes": "GPT-4o (Sys C): correct span చంకనాకిపోతోందని, missed idiomatic use",
+    "category": "FN-I"
+  },
+  "36": {
+    "row_num": 36,
+    "decision": "keep",
+    "sentence_display": "ఆమె **కడుపు చేతబట్టుకొని** తృప్తిగా నవ్వింది.",
+    "notes": "GPT-4o (Sys C): correct span కడుపు చేతబట్టుకొని, misclassified literal as idiomatic",
+    "category": "FP-L"
+  },
+  "34": {
+    "row_num": 34,
+    "decision": "keep",
+    "sentence_display": "ఆ కంపెనీ వాటా ధరలు కొండెక్కు, ఇన్వెస్టర్లు సంతోషించారు.",
+    "notes": "GPT-4o (Sys C): correct span కొండెక్కు, missed idiomatic use",
+    "category": "FN-I",
+    "lang": "Telugu",
+    "sys": "C",
+    "gold": "idiomatic",
+    "pred": "?"
+  }
+}

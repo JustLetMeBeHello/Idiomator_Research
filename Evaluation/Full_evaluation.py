@@ -99,6 +99,8 @@ def parse_args():
     p.add_argument('--xlmr_bio_preds',    default=None,
                    help='Override XLM-R BIO preds path (default: models/rigor_bio_xlmr_s{seed}/test_predictions.jsonl)')
     p.add_argument('--muril_joint_preds', default='flip-2/muril_joint_s42/test_predictions.jsonl')
+    p.add_argument('--llama3_preds',      default='models/rigor_llama3_single/test_predictions.jsonl',
+                   help='Llama-3.3-70B single-stage predictions (same format as System C).')
     return p.parse_args()
 
 
@@ -119,7 +121,7 @@ def load_preds(path):
 
 
 def compute_overlap_f1(pred_start, pred_end, gold_start, gold_end):
-    if pred_start is None or pred_end is None:
+    if pred_start is None or pred_end is None or gold_start is None or gold_end is None:
         return 0.0
     pred_set = set(range(pred_start, pred_end))
     gold_set = set(range(gold_start, gold_end))
@@ -502,8 +504,9 @@ def evaluate_system_a(s1_mbert, s2_mbert, n_bootstrap=10000):
     cls_results = cls_f1_per_lang(list(s1_mbert.values()), pred_key='pred_idiomaticity')
     print_cls_table("Stage 1 Classification:", cls_results)
 
-    exact_ub, overlap_ub = span_f1_per_lang(list(s2_mbert.values()))
-    print_span_table("Stage 2 Span (standalone — upper bound):", exact_ub, overlap_ub)
+    idio_s2_mbert = [r for r in s2_mbert.values() if r.get('idiomaticity') == 'idiomatic']
+    exact_ub, overlap_ub = span_f1_per_lang(idio_s2_mbert)
+    print_span_table("Stage 2 Span (standalone — idiomatic only):", exact_ub, overlap_ub)
 
     pipeline_records = build_pipeline_records(s1_mbert, s2_mbert, only_correct_cls=False)
     exact_e2e, overlap_e2e = span_f1_per_lang(pipeline_records)
@@ -562,8 +565,9 @@ def evaluate_system_b(s1_gpt, s2_gpt, n_bootstrap=10000):
     cls_results = cls_f1_per_lang(list(s1_gpt.values()), pred_key='pred_idiomaticity')
     print_cls_table("Stage 1 Classification:", cls_results)
 
-    exact_ub, overlap_ub = span_f1_per_lang(list(s2_gpt.values()))
-    print_span_table("Stage 2 Span (standalone):", exact_ub, overlap_ub)
+    idio_s2_gpt = [r for r in s2_gpt.values() if r.get('idiomaticity') == 'idiomatic']
+    exact_ub, overlap_ub = span_f1_per_lang(idio_s2_gpt)
+    print_span_table("Stage 2 Span (standalone — idiomatic only):", exact_ub, overlap_ub)
 
     pipeline_records = build_pipeline_records(s1_gpt, s2_gpt, only_correct_cls=False)
     exact_e2e, overlap_e2e = span_f1_per_lang(pipeline_records)
@@ -694,8 +698,9 @@ def evaluate_system_d(s1_mbert, span2_joint, n_bootstrap=10000):
     cls_results = cls_f1_per_lang(list(s1_mbert.values()), pred_key='pred_idiomaticity')
     print_cls_table("Stage 1 Classification:", cls_results)
 
-    exact_ub, overlap_ub = span_f1_per_lang(list(span2_joint.values()))
-    print_span_table("Joint Span Head (standalone — upper bound):", exact_ub, overlap_ub)
+    idio_span2 = [r for r in span2_joint.values() if r.get('idiomaticity') == 'idiomatic']
+    exact_ub, overlap_ub = span_f1_per_lang(idio_span2)
+    print_span_table("Joint Span Head (standalone — idiomatic only):", exact_ub, overlap_ub)
 
     pipeline_records = build_pipeline_records(s1_mbert, span2_joint, only_correct_cls=False)
     exact_e2e, overlap_e2e = span_f1_per_lang(pipeline_records)
@@ -756,11 +761,12 @@ def evaluate_system_e(joint_preds, n_bootstrap=10000):
     cls_results = cls_f1_per_lang(records, pred_key='pred_idiomaticity')
     print_cls_table("Classification:", cls_results)
 
-    exact_all, overlap_all = span_f1_per_lang(records)
-    print_span_table("Span Extraction (all examples):", exact_all, overlap_all)
-
     idiomatic_records = [r for r in records if r['idiomaticity'] == 'idiomatic']
     exact_idio, overlap_idio = span_f1_per_lang(idiomatic_records)
+    print_span_table("Span Extraction (idiomatic only — standalone):", exact_idio, overlap_idio)
+
+    exact_all, overlap_all = span_f1_per_lang(records)
+    print_span_table("Span Extraction (all examples — diagnostic):", exact_all, overlap_all)
     print_span_table("Span Extraction (idiomatic only):", exact_idio, overlap_idio)
 
     e2e_records = []
@@ -804,7 +810,7 @@ def evaluate_system_e(joint_preds, n_bootstrap=10000):
 
     return {
         'cls_f1':          cls_results,
-        'span_standalone': {'exact': exact_all,   'overlap': overlap_all},
+        'span_standalone': {'exact': exact_idio,  'overlap': overlap_idio},
         'span_e2e':        {'exact': exact_e2e,   'overlap': overlap_e2e},
         'span_correct_id': {'exact': exact_corr,  'overlap': overlap_corr},
         'joint_acc':       round(joint_acc, 4),
@@ -836,8 +842,9 @@ def evaluate_system_f(seq_phase1, seq_phase2, n_bootstrap=10000):
     cls_results = cls_f1_per_lang(list(seq_phase1.values()), pred_key='pred_idiomaticity')
     print_cls_table("Phase 1 Classification:", cls_results)
 
-    exact_p2, overlap_p2 = span_f1_per_lang(list(seq_phase2.values()))
-    print_span_table("Phase 2 Span (standalone):", exact_p2, overlap_p2)
+    idio_seq_phase2 = [r for r in seq_phase2.values() if r.get('idiomaticity') == 'idiomatic']
+    exact_p2, overlap_p2 = span_f1_per_lang(idio_seq_phase2)
+    print_span_table("Phase 2 Span (standalone — idiomatic only):", exact_p2, overlap_p2)
 
     pipeline_records = build_pipeline_records(seq_phase1, seq_phase2, only_correct_cls=False)
     exact_e2e, overlap_e2e = span_f1_per_lang(pipeline_records)
@@ -1039,6 +1046,16 @@ def evaluate_xlmr_bio(bio_preds, n_bootstrap=10000):
         print("  ✗ Missing — pass --xlmr_bio_preds")
         return None
     return evaluate_system_g(bio_preds, n_bootstrap=n_bootstrap)
+
+
+def evaluate_llama3_single(preds, n_bootstrap=10000):
+    print("\n" + "="*60)
+    print("Rigor Exp04: Llama-3.3-70B single-stage (Groq)")
+    print("="*60)
+    if not preds:
+        print("  ✗ Missing — pass --llama3_preds")
+        return None
+    return evaluate_system_c(preds, n_bootstrap=n_bootstrap)
 
 
 def evaluate_muril_joint(joint_preds, n_bootstrap=10000):
@@ -1398,7 +1415,8 @@ def main():
     xlmr_bio_path   = args.xlmr_bio_preds   or f'models/rigor_bio_xlmr_s{s}/test_predictions.jsonl'
     xlmr_joint  = load_preds(xlmr_joint_path)
     xlmr_bio    = load_preds(xlmr_bio_path)
-    muril_joint = load_preds(args.muril_joint_preds)
+    muril_joint  = load_preds(args.muril_joint_preds)
+    llama3_preds = load_preds(args.llama3_preds)
 
     print(f"  Stage 1 mBERT    : {len(s1_mbert)} predictions")
     print(f"  Stage 2 mBERT    : {len(s2_mbert)} predictions")
@@ -1462,7 +1480,8 @@ def main():
     results_c4 = evaluate_system_c4(single_gpt4, n_bootstrap=nb)
     results_xlmr_joint  = evaluate_xlmr_joint(xlmr_joint,  n_bootstrap=nb)
     results_xlmr_bio    = evaluate_xlmr_bio(xlmr_bio,      n_bootstrap=nb)
-    results_muril_joint = evaluate_muril_joint(muril_joint, n_bootstrap=nb)
+    results_muril_joint  = evaluate_muril_joint(muril_joint,  n_bootstrap=nb)
+    results_llama3       = evaluate_llama3_single(llama3_preds, n_bootstrap=nb)
 
     print_summary(results_a, results_b, results_c, results_d,
                   results_e, results_f, results_g,
@@ -1470,7 +1489,7 @@ def main():
 
     out_path = output_dir / 'pipeline_eval_results.json'
     all_results = json.loads(out_path.read_text()) if out_path.exists() else {}
-    all_results.update({
+    updates = {
         'system_a_mbert_pipeline':        results_a,
         'system_b_gpt_pipeline':          results_b,
         'system_b4_gpt_pipeline_4shot':   results_b4,
@@ -1483,7 +1502,13 @@ def main():
         f'rigor_xlmr_joint_s{args.xlmr_seed}': results_xlmr_joint,
         f'rigor_xlmr_bio_s{args.xlmr_seed}':   results_xlmr_bio,
         'rigor_muril_joint_s42':          results_muril_joint,
-    })
+        'rigor_llama3_single':            results_llama3,
+    }
+    # Never overwrite an existing non-None result with None (protects rigor seeds
+    # that were filtered out of the main common-set from being clobbered).
+    for k, v in updates.items():
+        if v is not None or k not in all_results or all_results[k] is None:
+            all_results[k] = v
     json.dump(all_results, open(out_path, 'w'), indent=2, default=str)
     print(f"\nFull results saved → {out_path}")
 

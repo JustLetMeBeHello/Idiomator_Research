@@ -1,0 +1,30 @@
+{
+  "model": "gpt-4o",
+  "approach": "single_stage",
+  "test_size": 379,
+  "classification_macro_f1": 0.7565,
+  "span_exact_match": 0.3641,
+  "span_overlap_f1": 0.6805,
+  "cls_per_lang": {
+    "English": 0.8031,
+    "Hindi": 0.6264,
+    "Telugu": 0.6684
+  },
+  "span_per_lang": {
+    "English": {
+      "exact": 0.315,
+      "overlap": 0.6387
+    },
+    "Hindi": {
+      "exact": 0.4909,
+      "overlap": 0.7375
+    },
+    "Telugu": {
+      "exact": 0.4429,
+      "overlap": 0.7876
+    }
+  },
+  "parse_failures": 0,
+  "spans_not_found": 10,
+  "cost_estimate": 0.0474
+}

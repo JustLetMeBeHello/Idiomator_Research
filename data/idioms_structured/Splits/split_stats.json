@@ -1,0 +1,94 @@
+{
+  "English": {
+    "sampled_total": 2542,
+    "unique_idioms": {
+      "train": 7710,
+      "dev": 964,
+      "test": 964
+    },
+    "train": {
+      "total": 2034,
+      "idiomatic": 1017,
+      "literal": 1017
+    },
+    "dev": {
+      "total": 254,
+      "idiomatic": 127,
+      "literal": 127
+    },
+    "test": {
+      "total": 254,
+      "idiomatic": 127,
+      "literal": 127
+    }
+  },
+  "Spanish": {
+    "sampled_total": 2542,
+    "unique_idioms": {
+      "train": 2548,
+      "dev": 318,
+      "test": 319
+    },
+    "train": {
+      "total": 2034,
+      "idiomatic": 1017,
+      "literal": 1017
+    },
+    "dev": {
+      "total": 254,
+      "idiomatic": 127,
+      "literal": 127
+    },
+    "test": {
+      "total": 254,
+      "idiomatic": 127,
+      "literal": 127
+    }
+  },
+  "Hindi": {
+    "sampled_total": 632,
+    "unique_idioms": {
+      "train": 146,
+      "dev": 18,
+      "test": 19
+    },
+    "train": {
+      "total": 508,
+      "idiomatic": 254,
+      "literal": 254
+    },
+    "dev": {
+      "total": 62,
+      "idiomatic": 31,
+      "literal": 31
+    },
+    "test": {
+      "total": 62,
+      "idiomatic": 31,
+      "literal": 31
+    }
+  },
+  "Telugu": {
+    "sampled_total": 629,
+    "unique_idioms": {
+      "train": 82,
+      "dev": 10,
+      "test": 11
+    },
+    "train": {
+      "total": 506,
+      "idiomatic": 252,
+      "literal": 254
+    },
+    "dev": {
+      "total": 61,
+      "idiomatic": 30,
+      "literal": 31
+    },
+    "test": {
+      "total": 62,
+      "idiomatic": 31,
+      "literal": 31
+    }
+  }
+}

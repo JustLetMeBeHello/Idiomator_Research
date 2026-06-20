@@ -1,0 +1,27 @@
+{
+  "best_dev_cls_f1": 0.8113934065934065,
+  "best_dev_joint_f1": 0.8535040827398297,
+  "best_epoch": 5,
+  "test_cls_macro_f1": 0.7884906135473237,
+  "test_span_exact": 0.7189132706374086,
+  "test_span_overlap": 0.888176482706603,
+  "model": "google/rembert",
+  "langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu"
+  ],
+  "test_langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu",
+    "Indonesian"
+  ],
+  "cls_loss_weight": 0.3,
+  "span_loss_weight": 1.9,
+  "train_size": 5082,
+  "dev_size": 631,
+  "test_size": 957
+}
