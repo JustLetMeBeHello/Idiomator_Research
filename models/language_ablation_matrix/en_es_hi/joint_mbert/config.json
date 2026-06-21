@@ -1,0 +1,28 @@
+{
+  "model_name": "bert-base-multilingual-cased",
+  "data_dir": "idioms_structured/Splits",
+  "dropout": 0.1,
+  "output_dir": "models/language_ablation_matrix/en_es_hi/joint_mbert",
+  "langs": [
+    "English",
+    "Spanish",
+    "Hindi"
+  ],
+  "test_langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu",
+    "Indonesian"
+  ],
+  "epochs": 7,
+  "batch_size": 32,
+  "lr": 2e-05,
+  "max_len": 128,
+  "warmup_ratio": 0.05,
+  "seed": 42,
+  "cls_loss_weight": 0.3,
+  "span_loss_weight": 1.9,
+  "use_wandb": false,
+  "device": "cuda"
+}

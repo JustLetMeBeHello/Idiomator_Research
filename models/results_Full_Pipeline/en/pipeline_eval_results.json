@@ -1,0 +1,730 @@
+{
+  "system_a_mbert_pipeline": null,
+  "system_b_gpt_pipeline": {
+    "cls_f1": {
+      "English": 0.8023,
+      "Hindi": 0.5989,
+      "Spanish": 0.7793,
+      "Telugu": 0.7319,
+      "Overall": 0.7693
+    },
+    "span_standalone": {
+      "exact": {
+        "English": 0.6482,
+        "Hindi": 0.629,
+        "Spanish": 0.5669,
+        "Telugu": 0.5806,
+        "Overall": 0.607
+      },
+      "overlap": {
+        "English": 0.7959,
+        "Hindi": 0.7647,
+        "Spanish": 0.7305,
+        "Telugu": 0.7383,
+        "Overall": 0.7609
+      }
+    },
+    "span_e2e": {
+      "exact": {
+        "English": 0.5827,
+        "Hindi": 0.6452,
+        "Spanish": 0.5906,
+        "Telugu": 0.5806,
+        "Overall": 0.5918
+      },
+      "overlap": {
+        "English": 0.7245,
+        "Hindi": 0.7521,
+        "Spanish": 0.725,
+        "Telugu": 0.7578,
+        "Overall": 0.7307
+      }
+    },
+    "span_correct_id": {
+      "exact": {
+        "English": 0.7184,
+        "Hindi": 0.7143,
+        "Spanish": 0.7282,
+        "Telugu": 0.6207,
+        "Overall": 0.711
+      },
+      "overlap": {
+        "English": 0.8933,
+        "Hindi": 0.8327,
+        "Spanish": 0.894,
+        "Telugu": 0.81,
+        "Overall": 0.8779
+      }
+    },
+    "joint_acc": 0.6498,
+    "joint_f1": {
+      "English": {
+        "macro_f1": 0.7826,
+        "literal": {
+          "P": 0.7752,
+          "R": 0.7937,
+          "F1": 0.7843
+        },
+        "idiomatic": {
+          "P": 0.7903,
+          "R": 0.7717,
+          "F1": 0.7809
+        }
+      },
+      "Hindi": {
+        "macro_f1": 0.5445,
+        "literal": {
+          "P": 0.6111,
+          "R": 0.3548,
+          "F1": 0.449
+        },
+        "idiomatic": {
+          "P": 0.5455,
+          "R": 0.7742,
+          "F1": 0.64
+        }
+      },
+      "Spanish": {
+        "macro_f1": 0.752,
+        "literal": {
+          "P": 0.754,
+          "R": 0.748,
+          "F1": 0.751
+        },
+        "idiomatic": {
+          "P": 0.75,
+          "R": 0.7559,
+          "F1": 0.7529
+        }
+      },
+      "Telugu": {
+        "macro_f1": 0.687,
+        "literal": {
+          "P": 0.7727,
+          "R": 0.5484,
+          "F1": 0.6415
+        },
+        "idiomatic": {
+          "P": 0.65,
+          "R": 0.8387,
+          "F1": 0.7324
+        }
+      },
+      "Overall": {
+        "macro_f1": 0.7398,
+        "macro_avg_f1": 0.6915,
+        "literal": {
+          "P": 0.7559,
+          "R": 0.7079,
+          "F1": 0.7311
+        },
+        "idiomatic": {
+          "P": 0.7262,
+          "R": 0.7722,
+          "F1": 0.7485
+        }
+      }
+    },
+    "stability": {
+      "mean_joint": 0.6915,
+      "std_joint": 0.0916,
+      "worst_lang": "Hindi",
+      "worst_f1": 0.5445,
+      "gap": 0.2381,
+      "stability": 0.5999,
+      "langs": {
+        "English": 0.7826,
+        "Spanish": 0.752,
+        "Hindi": 0.5445,
+        "Telugu": 0.687
+      }
+    },
+    "small_lang_ci": {
+      "n_examples": 124,
+      "cls_accuracy": [
+        0.6855,
+        0.6048,
+        0.7661
+      ],
+      "span_exact": [
+        0.6048,
+        0.5161,
+        0.6935
+      ],
+      "span_overlap": [
+        0.7515,
+        0.6823,
+        0.8183
+      ],
+      "joint_f1": [
+        0.629,
+        0.5403,
+        0.7177
+      ]
+    }
+  },
+  "system_c_gpt_single": {
+    "cls_f1": {
+      "English": 0.7889,
+      "Hindi": 0.5679,
+      "Spanish": 0.7817,
+      "Telugu": 0.683,
+      "Overall": 0.7581
+    },
+    "span_standalone": {
+      "exact": {
+        "English": 0.5118,
+        "Hindi": 0.5484,
+        "Spanish": 0.5748,
+        "Telugu": 0.7742,
+        "Overall": 0.5665
+      },
+      "overlap": {
+        "English": 0.7855,
+        "Hindi": 0.8513,
+        "Spanish": 0.8073,
+        "Telugu": 0.9243,
+        "Overall": 0.8143
+      }
+    },
+    "span_e2e": {
+      "exact": {
+        "English": 0.5039,
+        "Hindi": 0.5484,
+        "Spanish": 0.5591,
+        "Telugu": 0.7742,
+        "Overall": 0.557
+      },
+      "overlap": {
+        "English": 0.7465,
+        "Hindi": 0.8275,
+        "Spanish": 0.7524,
+        "Telugu": 0.9243,
+        "Overall": 0.7743
+      }
+    },
+    "span_correct_id": {
+      "exact": {
+        "English": 0.5766,
+        "Hindi": 0.5862,
+        "Spanish": 0.6396,
+        "Telugu": 0.7742,
+        "Overall": 0.6241
+      },
+      "overlap": {
+        "English": 0.8541,
+        "Hindi": 0.8846,
+        "Spanish": 0.8608,
+        "Telugu": 0.9243,
+        "Overall": 0.8676
+      }
+    },
+    "joint_acc": 0.5943,
+    "joint_f1": {
+      "English": {
+        "macro_f1": 0.7697,
+        "literal": {
+          "P": 0.8091,
+          "R": 0.7063,
+          "F1": 0.7542
+        },
+        "idiomatic": {
+          "P": 0.7413,
+          "R": 0.8346,
+          "F1": 0.7852
+        }
+      },
+      "Hindi": {
+        "macro_f1": 0.5679,
+        "literal": {
+          "P": 0.8182,
+          "R": 0.2903,
+          "F1": 0.4286
+        },
+        "idiomatic": {
+          "P": 0.5686,
+          "R": 0.9355,
+          "F1": 0.7073
+        }
+      },
+      "Spanish": {
+        "macro_f1": 0.7702,
+        "literal": {
+          "P": 0.8224,
+          "R": 0.6929,
+          "F1": 0.7521
+        },
+        "idiomatic": {
+          "P": 0.7347,
+          "R": 0.8504,
+          "F1": 0.7883
+        }
+      },
+      "Telugu": {
+        "macro_f1": 0.683,
+        "literal": {
+          "P": 1.0,
+          "R": 0.4194,
+          "F1": 0.5909
+        },
+        "idiomatic": {
+          "P": 0.6327,
+          "R": 1.0,
+          "F1": 0.775
+        }
+      },
+      "Overall": {
+        "macro_f1": 0.746,
+        "macro_avg_f1": 0.6977,
+        "literal": {
+          "P": 0.8257,
+          "R": 0.6317,
+          "F1": 0.7158
+        },
+        "idiomatic": {
+          "P": 0.7026,
+          "R": 0.8671,
+          "F1": 0.7762
+        }
+      }
+    },
+    "stability": {
+      "mean_joint": 0.6977,
+      "std_joint": 0.0829,
+      "worst_lang": "Hindi",
+      "worst_f1": 0.5679,
+      "gap": 0.2023,
+      "stability": 0.6148,
+      "langs": {
+        "English": 0.7697,
+        "Spanish": 0.7702,
+        "Hindi": 0.5679,
+        "Telugu": 0.683
+      }
+    },
+    "small_lang_ci": {
+      "n_examples": 124,
+      "cls_accuracy": [
+        0.5,
+        0.4113,
+        0.5887
+      ],
+      "span_exact": [
+        0.5726,
+        0.4839,
+        0.6613
+      ],
+      "span_overlap": [
+        0.8444,
+        0.8017,
+        0.8837
+      ],
+      "joint_f1": [
+        0.4919,
+        0.4032,
+        0.5806
+      ]
+    }
+  },
+  "system_d_mbert_s1_joint_span": null,
+  "system_e_joint_end_to_end": {
+    "cls_f1": {
+      "English": 0.8182,
+      "Hindi": 0.7199,
+      "Spanish": 0.7552,
+      "Telugu": 0.6795,
+      "Overall": 0.7709
+    },
+    "span_standalone": {
+      "exact": {
+        "English": 0.6838,
+        "Hindi": 0.2742,
+        "Spanish": 0.5748,
+        "Telugu": 0.3548,
+        "Overall": 0.5674
+      },
+      "overlap": {
+        "English": 0.8545,
+        "Hindi": 0.6064,
+        "Spanish": 0.7888,
+        "Telugu": 0.6856,
+        "Overall": 0.7871
+      }
+    },
+    "span_e2e": {
+      "exact": {
+        "English": 0.5827,
+        "Hindi": 0.1613,
+        "Spanish": 0.5512,
+        "Telugu": 0.2903,
+        "Overall": 0.5
+      },
+      "overlap": {
+        "English": 0.7302,
+        "Hindi": 0.4402,
+        "Spanish": 0.6946,
+        "Telugu": 0.6346,
+        "Overall": 0.6781
+      }
+    },
+    "span_correct_id": {
+      "exact": {
+        "English": 0.7048,
+        "Hindi": 0.1852,
+        "Spanish": 0.6796,
+        "Telugu": 0.3214,
+        "Overall": 0.6008
+      },
+      "overlap": {
+        "English": 0.8832,
+        "Hindi": 0.5055,
+        "Spanish": 0.8564,
+        "Telugu": 0.7026,
+        "Overall": 0.8147
+      }
+    },
+    "joint_acc": 0.6054,
+    "joint_f1": {
+      "English": {
+        "macro_f1": 0.8063,
+        "literal": {
+          "P": 0.8031,
+          "R": 0.8095,
+          "F1": 0.8063
+        },
+        "idiomatic": {
+          "P": 0.8095,
+          "R": 0.8031,
+          "F1": 0.8063
+        }
+      },
+      "Hindi": {
+        "macro_f1": 0.6591,
+        "literal": {
+          "P": 0.6923,
+          "R": 0.5806,
+          "F1": 0.6316
+        },
+        "idiomatic": {
+          "P": 0.6389,
+          "R": 0.7419,
+          "F1": 0.6866
+        }
+      },
+      "Spanish": {
+        "macro_f1": 0.7243,
+        "literal": {
+          "P": 0.7355,
+          "R": 0.7008,
+          "F1": 0.7177
+        },
+        "idiomatic": {
+          "P": 0.7143,
+          "R": 0.748,
+          "F1": 0.7308
+        }
+      },
+      "Telugu": {
+        "macro_f1": 0.6649,
+        "literal": {
+          "P": 0.7895,
+          "R": 0.4839,
+          "F1": 0.6
+        },
+        "idiomatic": {
+          "P": 0.6279,
+          "R": 0.871,
+          "F1": 0.7297
+        }
+      },
+      "Overall": {
+        "macro_f1": 0.7461,
+        "macro_avg_f1": 0.7137,
+        "literal": {
+          "P": 0.7645,
+          "R": 0.7111,
+          "F1": 0.7368
+        },
+        "idiomatic": {
+          "P": 0.7308,
+          "R": 0.7816,
+          "F1": 0.7554
+        }
+      }
+    },
+    "stability": {
+      "mean_joint": 0.7137,
+      "std_joint": 0.0593,
+      "worst_lang": "Hindi",
+      "worst_f1": 0.6591,
+      "gap": 0.1472,
+      "stability": 0.6544,
+      "langs": {
+        "English": 0.8063,
+        "Spanish": 0.7243,
+        "Hindi": 0.6591,
+        "Telugu": 0.6649
+      }
+    },
+    "small_lang_ci": {
+      "n_examples": 124,
+      "cls_accuracy": [
+        0.7097,
+        0.629,
+        0.7903
+      ],
+      "span_exact": [
+        0.3145,
+        0.2339,
+        0.3952
+      ],
+      "span_overlap": [
+        0.646,
+        0.5863,
+        0.702
+      ],
+      "joint_f1": [
+        0.6694,
+        0.5806,
+        0.75
+      ]
+    }
+  },
+  "system_f_sequential_phase1_ph2": {
+    "cls_f1": {
+      "English": 0.8128,
+      "Hindi": 0.687,
+      "Spanish": 0.6924,
+      "Telugu": 0.7565,
+      "Overall": 0.7483
+    },
+    "span_standalone": {
+      "exact": {
+        "English": 0.6047,
+        "Hindi": 0.2097,
+        "Spanish": 0.5197,
+        "Telugu": 0.3226,
+        "Overall": 0.504
+      },
+      "overlap": {
+        "English": 0.828,
+        "Hindi": 0.5134,
+        "Spanish": 0.7822,
+        "Telugu": 0.6842,
+        "Overall": 0.7645
+      }
+    },
+    "span_e2e": {
+      "exact": {
+        "English": 0.4803,
+        "Hindi": 0.0968,
+        "Spanish": 0.3228,
+        "Telugu": 0.1613,
+        "Overall": 0.3481
+      },
+      "overlap": {
+        "English": 0.6402,
+        "Hindi": 0.2827,
+        "Spanish": 0.4589,
+        "Telugu": 0.5637,
+        "Overall": 0.5248
+      }
+    },
+    "span_correct_id": {
+      "exact": {
+        "English": 0.663,
+        "Hindi": 0.1765,
+        "Spanish": 0.6029,
+        "Telugu": 0.1923,
+        "Overall": 0.5419
+      },
+      "overlap": {
+        "English": 0.8837,
+        "Hindi": 0.5155,
+        "Spanish": 0.8571,
+        "Telugu": 0.6721,
+        "Overall": 0.8169
+      }
+    },
+    "joint_acc": 0.6038,
+    "joint_f1": {
+      "English": {
+        "macro_f1": 0.8004,
+        "literal": {
+          "P": 0.75,
+          "R": 0.9048,
+          "F1": 0.8201
+        },
+        "idiomatic": {
+          "P": 0.8812,
+          "R": 0.7008,
+          "F1": 0.7807
+        }
+      },
+      "Hindi": {
+        "macro_f1": 0.6503,
+        "literal": {
+          "P": 0.619,
+          "R": 0.8387,
+          "F1": 0.7123
+        },
+        "idiomatic": {
+          "P": 0.75,
+          "R": 0.4839,
+          "F1": 0.5882
+        }
+      },
+      "Spanish": {
+        "macro_f1": 0.6744,
+        "literal": {
+          "P": 0.6358,
+          "R": 0.8661,
+          "F1": 0.7333
+        },
+        "idiomatic": {
+          "P": 0.7901,
+          "R": 0.5039,
+          "F1": 0.6154
+        }
+      },
+      "Telugu": {
+        "macro_f1": 0.7409,
+        "literal": {
+          "P": 0.7778,
+          "R": 0.6774,
+          "F1": 0.7241
+        },
+        "idiomatic": {
+          "P": 0.7143,
+          "R": 0.8065,
+          "F1": 0.7576
+        }
+      },
+      "Overall": {
+        "macro_f1": 0.7312,
+        "macro_avg_f1": 0.7165,
+        "literal": {
+          "P": 0.6878,
+          "R": 0.8603,
+          "F1": 0.7645
+        },
+        "idiomatic": {
+          "P": 0.8143,
+          "R": 0.6108,
+          "F1": 0.698
+        }
+      }
+    },
+    "stability": {
+      "mean_joint": 0.7165,
+      "std_joint": 0.0587,
+      "worst_lang": "Hindi",
+      "worst_f1": 0.6503,
+      "gap": 0.1501,
+      "stability": 0.6578,
+      "langs": {
+        "English": 0.8004,
+        "Spanish": 0.6744,
+        "Hindi": 0.6503,
+        "Telugu": 0.7409
+      }
+    },
+    "small_lang_ci": {
+      "n_examples": 124,
+      "cls_accuracy": [
+        0.7258,
+        0.6452,
+        0.7984
+      ],
+      "span_exact": [
+        0.2661,
+        0.1855,
+        0.3468
+      ],
+      "span_overlap": [
+        0.5988,
+        0.5352,
+        0.6617
+      ],
+      "joint_f1": [
+        0.7016,
+        0.621,
+        0.7823
+      ]
+    }
+  },
+  "system_g_bio_tagger": {
+    "cls_f1": null,
+    "span_all": {
+      "exact": {
+        "English": 0.4387,
+        "Hindi": 0.0484,
+        "Spanish": 0.2598,
+        "Telugu": 0.0,
+        "Overall": 0.2853
+      },
+      "overlap": {
+        "English": 0.7789,
+        "Hindi": 0.5939,
+        "Spanish": 0.6755,
+        "Telugu": 0.2544,
+        "Overall": 0.6676
+      }
+    },
+    "span_e2e": {
+      "exact": {
+        "English": 0.4646,
+        "Hindi": 0.0968,
+        "Spanish": 0.2756,
+        "Telugu": 0.0,
+        "Overall": 0.307
+      },
+      "overlap": {
+        "English": 0.808,
+        "Hindi": 0.573,
+        "Spanish": 0.6966,
+        "Telugu": 0.2673,
+        "Overall": 0.6871
+      }
+    },
+    "span_correct_id": {
+      "exact": {
+        "English": 0.4646,
+        "Hindi": 0.0968,
+        "Spanish": 0.2756,
+        "Telugu": 0.0,
+        "Overall": 0.307
+      },
+      "overlap": {
+        "English": 0.808,
+        "Hindi": 0.573,
+        "Spanish": 0.6966,
+        "Telugu": 0.2673,
+        "Overall": 0.6871
+      }
+    },
+    "joint_acc": 0.2853,
+    "joint_f1": {
+      "English": 0.4696,
+      "Hindi": 0.4464,
+      "Spanish": 0.4478,
+      "Telugu": 0.4464,
+      "Overall": 0.4565
+    },
+    "stability": {
+      "mean_joint": 0.4526,
+      "std_joint": 0.0099,
+      "worst_lang": "Hindi",
+      "worst_f1": 0.4464,
+      "gap": 0.0232,
+      "stability": 0.4427,
+      "langs": {
+        "English": 0.4696,
+        "Spanish": 0.4478,
+        "Hindi": 0.4464,
+        "Telugu": 0.4464
+      }
+    },
+    "indonesian_ci": null
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "best_dev_cls_f1": 0.7235589635113697,
+  "best_dev_joint_f1": 0.7694097487839583,
+  "best_epoch": 7,
+  "test_cls_macro_f1": 0.6600859309387894,
+  "test_span_exact": 0.3793103448275862,
+  "test_span_overlap": 0.6628000823507099,
+  "model": "bert-base-multilingual-cased",
+  "langs": [
+    "Hindi",
+    "Telugu"
+  ],
+  "test_langs": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "Telugu",
+    "Indonesian"
+  ],
+  "cls_loss_weight": 0.3,
+  "span_loss_weight": 1.9,
+  "train_size": 1014,
+  "dev_size": 123,
+  "test_size": 957
+}

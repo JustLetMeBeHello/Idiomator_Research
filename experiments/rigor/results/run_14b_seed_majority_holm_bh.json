@@ -1,0 +1,89 @@
+{
+  "fix": "N2b_seed_majority_holm_bh",
+  "alpha": 0.05,
+  "n_bootstrap": 10000,
+  "family_size": 4,
+  "mbert_preds": [
+    "/Users/shishirmaddineni/Desktop/Idiomator_Research/IdiomBERT/experiments/models/en_es_hi_te/joint_mbert/test_predictions.jsonl",
+    "/Users/shishirmaddineni/Desktop/Idiomator_Research/IdiomBERT/experiments/models/main_s123/joint_mbert/test_predictions.jsonl",
+    "/Users/shishirmaddineni/Desktop/Idiomator_Research/IdiomBERT/experiments/models/main_s7/joint_mbert/test_predictions.jsonl"
+  ],
+  "gpt_preds": "/Users/shishirmaddineni/Desktop/Idiomator_Research/IdiomBERT/experiments/models/gpt_single_stage/test_predictions.jsonl",
+  "rows": [
+    {
+      "lang": "English",
+      "n": 253,
+      "mbert_majority_f1": 0.774,
+      "gpt_f1": 0.7697,
+      "seed_unanimous_rate": 0.8933,
+      "diff": 0.0043,
+      "ci": [
+        -0.0553,
+        0.0623
+      ],
+      "p_raw": 0.8888,
+      "p_holm": 0.8888,
+      "p_bh": 0.8888,
+      "sig_raw": false,
+      "sig_holm": false,
+      "sig_bh": false
+    },
+    {
+      "lang": "Spanish",
+      "n": 254,
+      "mbert_majority_f1": 0.7241,
+      "gpt_f1": 0.7702,
+      "seed_unanimous_rate": 0.9055,
+      "diff": -0.0461,
+      "ci": [
+        -0.1202,
+        0.026
+      ],
+      "p_raw": 0.2162,
+      "p_holm": 0.8648,
+      "p_bh": 0.37813,
+      "sig_raw": false,
+      "sig_holm": false,
+      "sig_bh": false
+    },
+    {
+      "lang": "Hindi",
+      "n": 62,
+      "mbert_majority_f1": 0.6688,
+      "gpt_f1": 0.5679,
+      "seed_unanimous_rate": 0.8226,
+      "diff": 0.1009,
+      "ci": [
+        -0.0683,
+        0.2695
+      ],
+      "p_raw": 0.2502,
+      "p_holm": 0.8648,
+      "p_bh": 0.37813,
+      "sig_raw": false,
+      "sig_holm": false,
+      "sig_bh": false
+    },
+    {
+      "lang": "Telugu",
+      "n": 62,
+      "mbert_majority_f1": 0.758,
+      "gpt_f1": 0.683,
+      "seed_unanimous_rate": 0.8871,
+      "diff": 0.075,
+      "ci": [
+        -0.0623,
+        0.2186
+      ],
+      "p_raw": 0.2836,
+      "p_holm": 0.8648,
+      "p_bh": 0.37813,
+      "sig_raw": false,
+      "sig_holm": false,
+      "sig_bh": false
+    }
+  ],
+  "n_sig_holm": 0,
+  "n_sig_bh": 0,
+  "verdict": "No per-language 3-seed-majority-mBERT>GPT-4o comparison survives Holm-Bonferroni at α=0.05, even with the ensembled, lower-variance mBERT prediction."
+}

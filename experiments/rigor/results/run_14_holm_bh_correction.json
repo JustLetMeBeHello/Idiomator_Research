@@ -1,0 +1,81 @@
+{
+  "fix": "N2_holm_bh_correction",
+  "alpha": 0.05,
+  "n_bootstrap": 2000,
+  "family_size": 4,
+  "mbert_preds": "/Users/shishirmaddineni/Desktop/Idiomator_Research/IdiomBERT/experiments/models/en_es_hi_te/joint_mbert/test_predictions.jsonl",
+  "gpt_preds": "/Users/shishirmaddineni/Desktop/Idiomator_Research/IdiomBERT/experiments/models/gpt_single_stage/test_predictions.jsonl",
+  "rows": [
+    {
+      "lang": "English",
+      "n": 253,
+      "mbert_f1": 0.7745,
+      "gpt_f1": 0.7697,
+      "diff": 0.0048,
+      "ci": [
+        -0.0525,
+        0.0576
+      ],
+      "p_raw": 0.896,
+      "p_holm": 1.0,
+      "p_bh": 0.896,
+      "sig_raw": false,
+      "sig_holm": false,
+      "sig_bh": false
+    },
+    {
+      "lang": "Spanish",
+      "n": 254,
+      "mbert_f1": 0.752,
+      "gpt_f1": 0.7702,
+      "diff": -0.0183,
+      "ci": [
+        -0.0903,
+        0.0519
+      ],
+      "p_raw": 0.589,
+      "p_holm": 1.0,
+      "p_bh": 0.78533,
+      "sig_raw": false,
+      "sig_holm": false,
+      "sig_bh": false
+    },
+    {
+      "lang": "Hindi",
+      "n": 62,
+      "mbert_f1": 0.6357,
+      "gpt_f1": 0.5679,
+      "diff": 0.0677,
+      "ci": [
+        -0.0996,
+        0.241
+      ],
+      "p_raw": 0.415,
+      "p_holm": 1.0,
+      "p_bh": 0.78533,
+      "sig_raw": false,
+      "sig_holm": false,
+      "sig_bh": false
+    },
+    {
+      "lang": "Telugu",
+      "n": 62,
+      "mbert_f1": 0.7903,
+      "gpt_f1": 0.683,
+      "diff": 0.1073,
+      "ci": [
+        -0.0185,
+        0.248
+      ],
+      "p_raw": 0.113,
+      "p_holm": 0.452,
+      "p_bh": 0.452,
+      "sig_raw": false,
+      "sig_holm": false,
+      "sig_bh": false
+    }
+  ],
+  "n_sig_holm": 0,
+  "n_sig_bh": 0,
+  "verdict": "No per-language mBERT>GPT-4o comparison survives Holm-Bonferroni correction at α=0.05; drop 'confirms statistically' and report descriptively."
+}

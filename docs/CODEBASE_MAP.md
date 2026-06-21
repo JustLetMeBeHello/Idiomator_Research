@@ -1,6 +1,6 @@
 # CODEBASE_MAP — IdiomBERT / Research_And_Training
 
-> Auto-generated 2026-06-11; rigor runners updated 2026-06-19; ablation matrix section corrected 2026-06-20. Read this before grepping the repo.
+> Auto-generated 2026-06-11; rigor runners updated 2026-06-19; ablation matrix section corrected 2026-06-20; N2 3-seed status updated 2026-06-20. Read this before grepping the repo.
 > Trust it unless it conflicts with something you can see in the actual file.
 > Update touched sections after any session that adds/renames files or functions.
 
@@ -156,8 +156,9 @@ These are numbered experiments adding statistical rigor to paper claims.
 | `run_10_id10m_eval.py` | ID10M zero-shot eval | done (EN BIO=0.615, ES BIO=0.590) |
 | `run_12_id10m_systemg_eval.py` | ID10M eval specifically for System G | done |
 | `run_13_tost_equivalence.py` | **N1** — TOST equivalence test for C1 (replaces "CI contains reference"); reuses run_08 evaluate_encoder; default Δ=0.02; `--reference wp|zero` | NEW 2026-06-19; unrun (needs Colab preds-root) |
-| `run_14_holm_bh_correction.py` | **N2** — Holm-Bonferroni + BH correction on per-language mBERT-vs-GPT-4o Joint-F1 family (paired bootstrap p); no scipy dep | NEW 2026-06-19; ran on local preds → 0/4 survive correction (single-seed E vs C) |
-| `run_15_multiseed_main_tables.sh` | **E2** — multi-seed (123/7) driver for mBERT A–G tables (Stage_1/Stage_2/Train_Join/Train_Sequential/BiO at default=seed-42 hparams); Drive gate + FORCE=1 + --dry-run | NEW 2026-06-19; dry-run verified, GPU run pending |
+| `run_14_holm_bh_correction.py` | **N2** — Holm-Bonferroni + BH correction on per-language mBERT-vs-GPT-4o Joint-F1 family (paired bootstrap p); no scipy dep | DONE all 3 seeds (42/123/7) independently, 2026-06-20 — 0/4 survive correction at any seed, robust null |
+| `run_14b_seed_majority_holm_bh.py` | **N2 (3-seed combined)** — majority-vote ensembles the 3 seeds' mBERT predictions per sentence (right if ≥2/3 agree) before the same bootstrap+Holm/BH; the statistically correct way to use 3 seeds (naive row-concat is pseudo-replication + GPT is seed-deterministic so pooling it fakes a tighter CI) | NEW 2026-06-20; ran — still 0/4 survive even ensembled |
+| `run_15_multiseed_main_tables.sh` | **E2** — multi-seed (123/7) driver for mBERT A–G tables (Stage_1/Stage_2/Train_Join/Train_Sequential/BiO at default=seed-42 hparams); Drive gate + FORCE=1 + --dry-run | **DONE 2026-06-20** — seeds 123/7 trained+registered (commit `0ff2b09`), joined w/ seed-42; 3-seed mean±std + per-language breakdown written into `IdiomBERT_Submission_Ready_v8.docx` same day |
 | `run_16_wordpiece_word_tagger.py` | **E3** — WordPiece WORD-level POS-style tagger (mean-pool subwords→word, one B/I/O/word, word-boundary decode); plugs into Full_evaluation via `--bio_preds` | NEW 2026-06-19; smoke-tested locally, GPU run pending |
 | `check_metric_drift.py` | Detects if metrics in json drifted from expected values | run before any paper build |
 | `sample_error_analysis.py` | Sample ~25 error examples for §9 error table | not yet run for paper |

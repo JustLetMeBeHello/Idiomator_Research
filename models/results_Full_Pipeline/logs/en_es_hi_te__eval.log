@@ -1,0 +1,595 @@
+Loading prediction files...
+  Stage 1 mBERT    : 959 predictions
+  Stage 2 mBERT    : 956 predictions
+  Stage 1 GPT      : 959 predictions
+  Stage 2 GPT      : 959 predictions
+  Single GPT       : 959 predictions
+  Joint mBERT      : 956 predictions
+  Joint span only  : 956 predictions
+  Sequential Ph1   : 956 predictions
+  Sequential Ph2   : 956 predictions
+  BIO Tagger       : 956 predictions
+  Bootstrap resamples: 10000
+
+  Common sentences across all systems: 956
+  Filtering to common set for fair comparison...
+  After filtering: 956 examples per system
+
+
+============================================================
+System A: mBERT Stage 1 → mBERT Stage 2 (two-stage pipeline)
+============================================================
+
+  Stage 1 Classification:
+  Language     Macro F1  
+  ------------------------
+  English      0.8063    
+  Hindi        0.6870    
+  Indonesian   0.8092    
+  Spanish      0.7432    
+  Telugu       0.7898    
+  Overall      0.7823    
+
+  Stage 2 Span (standalone — upper bound):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.7115     0.8675      
+  Hindi        0.6290     0.8870      
+  Indonesian   0.4769     0.7184      
+  Spanish      0.6890     0.8534      
+  Telugu       0.8387     0.9049      
+  Overall      0.6287     0.8168      
+
+  Full Pipeline Span (end-to-end):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.5669     0.7222      
+  Hindi        0.4516     0.5190      
+  Indonesian   0.4065     0.6489      
+  Spanish      0.4803     0.6117      
+  Telugu       0.7097     0.7552      
+  Overall      0.4926     0.6571      
+
+  Span F1 (Correct Stage 1 Identifications Only):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.7200     0.9172      
+  Hindi        0.8235     0.9464      
+  Indonesian   0.4773     0.7620      
+  Spanish      0.7011     0.8929      
+  Telugu       0.8462     0.9005      
+  Overall      0.6409     0.8549      
+
+  Joint accuracy (cls + span both correct): 0.6464 (618/956)
+
+  Joint F1 breakdown:
+    English    macro=0.8023  literal: P=0.7879 R=0.8254 F1=0.8062  idiomatic: P=0.8182 R=0.7795 F1=0.7984
+    Hindi      macro=0.6870  literal: P=0.6500 R=0.8387 F1=0.7324  idiomatic: P=0.7727 R=0.5484 F1=0.6415
+    Indonesian macro=0.7689  literal: P=0.7844 R=0.7706 F1=0.7774  idiomatic: P=0.7532 R=0.7677 F1=0.7604
+    Spanish    macro=0.7309  literal: P=0.7034 R=0.8031 F1=0.7500  idiomatic: P=0.7706 R=0.6614 F1=0.7119
+    Telugu     macro=0.7740  literal: P=0.7931 R=0.7419 F1=0.7667  idiomatic: P=0.7576 R=0.8065 F1=0.7812
+    Overall    macro=0.7631  macro_avg=0.7486  literal: P=0.7524 R=0.7959 F1=0.7735  idiomatic: P=0.7765 R=0.7304 F1=0.7527
+
+  Stability metrics (in-distribution languages):
+  Mean Joint F1:  0.7486
+  Std (langs):    0.0437   (lower = more stable)
+  Worst language: Hindi = 0.6870
+  Best-Worst gap: 0.1153
+  Stability score (mean - std): 0.7049
+  Per-language: English=0.8023  Spanish=0.7309  Hindi=0.6870  Telugu=0.7740
+
+  Hindi/Telugu held-out generalization:  (n=124, 95% bootstrap CI, n_resamples=10,000)
+  Metric             Point      95% CI              
+  --------------------------------------------------
+  Cls Accuracy       0.7419     [0.6613, 0.8145]
+  Span Exact         0.7339     [0.6532, 0.8065]
+  Span Overlap F1    0.8960     [0.8539, 0.9335]
+  Joint F1           0.7339     [0.6532, 0.8065]
+
+============================================================
+System B: GPT-4o Stage 1 → GPT-4o Stage 2 (two-stage pipeline)
+============================================================
+
+  Stage 1 Classification:
+  Language     Macro F1  
+  ------------------------
+  English      0.8023    
+  Hindi        0.5989    
+  Indonesian   0.7415    
+  Spanish      0.7793    
+  Telugu       0.7319    
+  Overall      0.7599    
+
+  Stage 2 Span (standalone):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.6482     0.7959      
+  Hindi        0.6290     0.7647      
+  Indonesian   0.5815     0.6816      
+  Spanish      0.5669     0.7305      
+  Telugu       0.5806     0.7383      
+  Overall      0.5983     0.7339      
+
+  Full Pipeline Span (end-to-end):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.5827     0.7245      
+  Hindi        0.6452     0.7521      
+  Indonesian   0.6194     0.6669      
+  Spanish      0.5906     0.7250      
+  Telugu       0.5806     0.7578      
+  Overall      0.6008     0.7097      
+
+  Span F1 (Correct Stage 1 Identifications Only):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.7184     0.8933      
+  Hindi        0.7143     0.8327      
+  Indonesian   0.7805     0.8404      
+  Spanish      0.7282     0.8940      
+  Telugu       0.6207     0.8100      
+  Overall      0.7332     0.8660      
+
+  Joint accuracy (cls + span both correct): 0.6527 (624/956)
+
+  Joint F1 breakdown:
+    English    macro=0.7826  literal: P=0.7752 R=0.7937 F1=0.7843  idiomatic: P=0.7903 R=0.7717 F1=0.7809
+    Hindi      macro=0.5445  literal: P=0.6111 R=0.3548 F1=0.4490  idiomatic: P=0.5455 R=0.7742 F1=0.6400
+    Indonesian macro=0.6888  literal: P=0.7066 R=0.6941 F1=0.7003  idiomatic: P=0.6709 R=0.6839 F1=0.6773
+    Spanish    macro=0.7520  literal: P=0.7540 R=0.7480 F1=0.7510  idiomatic: P=0.7500 R=0.7559 F1=0.7529
+    Telugu     macro=0.6870  literal: P=0.7727 R=0.5484 F1=0.6415  idiomatic: P=0.6500 R=0.8387 F1=0.7324
+    Overall    macro=0.7228  macro_avg=0.6915  literal: P=0.7381 R=0.7031 F1=0.7202  idiomatic: P=0.7085 R=0.7431 F1=0.7254
+
+  Stability metrics (in-distribution languages):
+  Mean Joint F1:  0.6915
+  Std (langs):    0.0916   (lower = more stable)
+  Worst language: Hindi = 0.5445
+  Best-Worst gap: 0.2381
+  Stability score (mean - std): 0.5999
+  Per-language: English=0.7826  Spanish=0.7520  Hindi=0.5445  Telugu=0.6870
+
+  Hindi/Telugu held-out generalization:  (n=124, 95% bootstrap CI, n_resamples=10,000)
+  Metric             Point      95% CI              
+  --------------------------------------------------
+  Cls Accuracy       0.6855     [0.6048, 0.7661]
+  Span Exact         0.6048     [0.5161, 0.6935]
+  Span Overlap F1    0.7515     [0.6823, 0.8183]
+  Joint F1           0.6290     [0.5403, 0.7177]
+
+============================================================
+System C: GPT-4o Single-Stage (classify + extract in one prompt)
+============================================================
+
+  Classification:
+  Language     Macro F1  
+  ------------------------
+  English      0.7889    
+  Hindi        0.5679    
+  Indonesian   0.6662    
+  Spanish      0.7817    
+  Telugu       0.6830    
+  Overall      0.7268    
+
+  Span Extraction (Idiomatic Only):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.5118     0.7855      
+  Hindi        0.5484     0.8513      
+  Indonesian   0.6194     0.7379      
+  Spanish      0.5748     0.8073      
+  Telugu       0.7742     0.9243      
+  Overall      0.5839     0.7892      
+
+  Span F1 (E2E — cls errors zeroed):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.5039     0.7465      
+  Hindi        0.5484     0.8275      
+  Indonesian   0.6000     0.6902      
+  Spanish      0.5591     0.7524      
+  Telugu       0.7742     0.9243      
+  Overall      0.5711     0.7466      
+
+  Span F1 (Correct Identifications Only):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.5766     0.8541      
+  Hindi        0.5862     0.8846      
+  Indonesian   0.7266     0.8358      
+  Spanish      0.6396     0.8608      
+  Telugu       0.7742     0.9243      
+  Overall      0.6561     0.8577      
+
+  Joint accuracy (cls + span both correct): 0.5837 (558/956)
+
+  Joint F1 breakdown:
+    English    macro=0.7697  literal: P=0.8091 R=0.7063 F1=0.7542  idiomatic: P=0.7413 R=0.8346 F1=0.7852
+    Hindi      macro=0.5679  literal: P=0.8182 R=0.2903 F1=0.4286  idiomatic: P=0.5686 R=0.9355 F1=0.7073
+    Indonesian macro=0.6373  literal: P=0.7087 R=0.5294 F1=0.6061  idiomatic: P=0.5960 R=0.7613 F1=0.6686
+    Spanish    macro=0.7702  literal: P=0.8224 R=0.6929 F1=0.7521  idiomatic: P=0.7347 R=0.8504 F1=0.7883
+    Telugu     macro=0.6830  literal: P=1.0000 R=0.4194 F1=0.5909  idiomatic: P=0.6327 R=1.0000 F1=0.7750
+    Overall    macro=0.7090  macro_avg=0.6977  literal: P=0.7853 R=0.5959 F1=0.6776  idiomatic: P=0.6667 R=0.8323 F1=0.7403
+
+  Stability metrics (in-distribution languages):
+  Mean Joint F1:  0.6977
+  Std (langs):    0.0829   (lower = more stable)
+  Worst language: Hindi = 0.5679
+  Best-Worst gap: 0.2023
+  Stability score (mean - std): 0.6148
+  Per-language: English=0.7697  Spanish=0.7702  Hindi=0.5679  Telugu=0.6830
+
+  Hindi/Telugu held-out generalization:  (n=124, 95% bootstrap CI, n_resamples=10,000)
+  Metric             Point      95% CI              
+  --------------------------------------------------
+  Cls Accuracy       0.5000     [0.4113, 0.5887]
+  Span Exact         0.5726     [0.4839, 0.6613]
+  Span Overlap F1    0.8444     [0.8017, 0.8837]
+  Joint F1           0.4919     [0.4032, 0.5806]
+
+============================================================
+System D: mBERT Stage 1 → Joint Model Span Head
+============================================================
+
+  Stage 1 Classification:
+  Language     Macro F1  
+  ------------------------
+  English      0.8063    
+  Hindi        0.6870    
+  Indonesian   0.8092    
+  Spanish      0.7432    
+  Telugu       0.7898    
+  Overall      0.7823    
+
+  Joint Span Head (standalone — upper bound):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.7115     0.8675      
+  Hindi        0.6290     0.8870      
+  Indonesian   0.4769     0.7184      
+  Spanish      0.6890     0.8534      
+  Telugu       0.8387     0.9049      
+  Overall      0.6287     0.8168      
+
+  Full Pipeline Span (end-to-end):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.5669     0.7222      
+  Hindi        0.4516     0.5190      
+  Indonesian   0.4065     0.6489      
+  Spanish      0.4803     0.6117      
+  Telugu       0.7097     0.7552      
+  Overall      0.4926     0.6571      
+
+  Span F1 (Correct Stage 1 Identifications Only):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.7200     0.9172      
+  Hindi        0.8235     0.9464      
+  Indonesian   0.4773     0.7620      
+  Spanish      0.7011     0.8929      
+  Telugu       0.8462     0.9005      
+  Overall      0.6409     0.8549      
+
+  Joint accuracy (cls + span both correct): 0.6464 (618/956)
+
+  Joint F1 breakdown:
+    English    macro=0.8023  literal: P=0.7879 R=0.8254 F1=0.8062  idiomatic: P=0.8182 R=0.7795 F1=0.7984
+    Hindi      macro=0.6870  literal: P=0.6500 R=0.8387 F1=0.7324  idiomatic: P=0.7727 R=0.5484 F1=0.6415
+    Indonesian macro=0.7689  literal: P=0.7844 R=0.7706 F1=0.7774  idiomatic: P=0.7532 R=0.7677 F1=0.7604
+    Spanish    macro=0.7309  literal: P=0.7034 R=0.8031 F1=0.7500  idiomatic: P=0.7706 R=0.6614 F1=0.7119
+    Telugu     macro=0.7740  literal: P=0.7931 R=0.7419 F1=0.7667  idiomatic: P=0.7576 R=0.8065 F1=0.7812
+    Overall    macro=0.7631  macro_avg=0.7486  literal: P=0.7524 R=0.7959 F1=0.7735  idiomatic: P=0.7765 R=0.7304 F1=0.7527
+
+  Stability metrics (in-distribution languages):
+  Mean Joint F1:  0.7486
+  Std (langs):    0.0437   (lower = more stable)
+  Worst language: Hindi = 0.6870
+  Best-Worst gap: 0.1153
+  Stability score (mean - std): 0.7049
+  Per-language: English=0.8023  Spanish=0.7309  Hindi=0.6870  Telugu=0.7740
+
+  Hindi/Telugu held-out generalization:  (n=124, 95% bootstrap CI, n_resamples=10,000)
+  Metric             Point      95% CI              
+  --------------------------------------------------
+  Cls Accuracy       0.7419     [0.6613, 0.8145]
+  Span Exact         0.7339     [0.6532, 0.8065]
+  Span Overlap F1    0.8960     [0.8539, 0.9335]
+  Joint F1           0.7339     [0.6532, 0.8065]
+
+============================================================
+System E: Joint mBERT (single model — classify + span)
+============================================================
+
+  Classification:
+  Language     Macro F1  
+  ------------------------
+  English      0.7825    
+  Hindi        0.6540    
+  Indonesian   0.7968    
+  Spanish      0.7677    
+  Telugu       0.7903    
+  Overall      0.7760    
+
+  Span Extraction (all examples):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.6798     0.8547      
+  Hindi        0.5645     0.8396      
+  Indonesian   0.4923     0.7312      
+  Spanish      0.6811     0.8480      
+  Telugu       0.8065     0.8951      
+  Overall      0.6172     0.8126      
+
+  Span Extraction (idiomatic only):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.6693     0.8843      
+  Hindi        0.5806     0.8406      
+  Indonesian   0.5097     0.7628      
+  Spanish      0.7559     0.8959      
+  Telugu       0.8387     0.9293      
+  Overall      0.6454     0.8475      
+
+  Span F1 (E2E — cls errors zeroed):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.5118     0.6744      
+  Hindi        0.3548     0.4476      
+  Indonesian   0.4258     0.6319      
+  Spanish      0.5906     0.7047      
+  Telugu       0.6452     0.7190      
+  Overall      0.5032     0.6566      
+
+  Span F1 (Correct Identifications Only):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.6771     0.8921      
+  Hindi        0.6875     0.8673      
+  Indonesian   0.5280     0.7835      
+  Spanish      0.7576     0.9040      
+  Telugu       0.8333     0.9287      
+  Overall      0.6583     0.8590      
+
+  Joint accuracy (cls + span both correct): 0.6475 (619/956)
+
+  Joint F1 breakdown:
+    English    macro=0.7745  literal: P=0.7556 R=0.8095 F1=0.7816  idiomatic: P=0.7966 R=0.7402 F1=0.7673
+    Hindi      macro=0.6357  literal: P=0.6098 R=0.8065 F1=0.6944  idiomatic: P=0.7143 R=0.4839 F1=0.5769
+    Indonesian macro=0.7685  literal: P=0.7746 R=0.7882 F1=0.7813  idiomatic: P=0.7632 R=0.7484 F1=0.7557
+    Spanish    macro=0.7520  literal: P=0.7500 R=0.7559 F1=0.7529  idiomatic: P=0.7540 R=0.7480 F1=0.7510
+    Telugu     macro=0.7903  literal: P=0.7812 R=0.8065 F1=0.7937  idiomatic: P=0.8000 R=0.7742 F1=0.7869
+    Overall    macro=0.7590  macro_avg=0.7381  literal: P=0.7505 R=0.7876 F1=0.7686  idiomatic: P=0.7696 R=0.7304 F1=0.7495
+
+  Stability metrics (in-distribution languages):
+  Mean Joint F1:  0.7381
+  Std (langs):    0.0607   (lower = more stable)
+  Worst language: Hindi = 0.6357
+  Best-Worst gap: 0.1546
+  Stability score (mean - std): 0.6774
+  Per-language: English=0.7745  Spanish=0.7520  Hindi=0.6357  Telugu=0.7903
+
+  Hindi/Telugu held-out generalization:  (n=124, 95% bootstrap CI, n_resamples=10,000)
+  Metric             Point      95% CI              
+  --------------------------------------------------
+  Cls Accuracy       0.7258     [0.6452, 0.7984]
+  Span Exact         0.6855     [0.6048, 0.7661]
+  Span Overlap F1    0.8673     [0.8222, 0.9091]
+  Joint F1           0.7177     [0.6371, 0.7903]
+
+============================================================
+System F: Sequential mBERT (Phase 1 cls → Phase 2 span fine-tune)
+============================================================
+
+  Phase 1 Classification:
+  Language     Macro F1  
+  ------------------------
+  English      0.7900    
+  Hindi        0.6591    
+  Indonesian   0.7752    
+  Spanish      0.7756    
+  Telugu       0.8046    
+  Overall      0.7741    
+
+  Phase 2 Span (standalone):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.6680     0.8538      
+  Hindi        0.5806     0.8714      
+  Indonesian   0.5046     0.7348      
+  Spanish      0.6575     0.8343      
+  Telugu       0.8065     0.8874      
+  Overall      0.6130     0.8115      
+
+  Full Sequential Pipeline (end-to-end):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.5354     0.6709      
+  Hindi        0.3871     0.4929      
+  Indonesian   0.4452     0.6563      
+  Spanish      0.5197     0.6776      
+  Telugu       0.7419     0.8221      
+  Overall      0.5053     0.6661      
+
+  Span F1 (Correct Phase 1 Identifications Only):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.7234     0.9064      
+  Hindi        0.6667     0.8489      
+  Indonesian   0.5267     0.7766      
+  Spanish      0.6804     0.8871      
+  Telugu       0.8214     0.9102      
+  Overall      0.6467     0.8526      
+
+  Joint accuracy (cls + span both correct): 0.6381 (610/956)
+
+  Joint F1 breakdown:
+    English    macro=0.7819  literal: P=0.7518 R=0.8413 F1=0.7940  idiomatic: P=0.8214 R=0.7244 F1=0.7699
+    Hindi      macro=0.6418  literal: P=0.6216 R=0.7419 F1=0.6765  idiomatic: P=0.6800 R=0.5484 F1=0.6071
+    Indonesian macro=0.7354  literal: P=0.7658 R=0.7118 F1=0.7378  idiomatic: P=0.7066 R=0.7613 F1=0.7329
+    Spanish    macro=0.7636  literal: P=0.7519 R=0.7874 F1=0.7692  idiomatic: P=0.7769 R=0.7402 F1=0.7581
+    Telugu     macro=0.7889  literal: P=0.8462 R=0.7097 F1=0.7719  idiomatic: P=0.7500 R=0.8710 F1=0.8060
+    Overall    macro=0.7530  macro_avg=0.7440  literal: P=0.7515 R=0.7670 F1=0.7592  idiomatic: P=0.7549 R=0.7389 F1=0.7468
+
+  Stability metrics (in-distribution languages):
+  Mean Joint F1:  0.7440
+  Std (langs):    0.0598   (lower = more stable)
+  Worst language: Hindi = 0.6418
+  Best-Worst gap: 0.1471
+  Stability score (mean - std): 0.6843
+  Per-language: English=0.7819  Spanish=0.7636  Hindi=0.6418  Telugu=0.7889
+
+  Hindi/Telugu held-out generalization:  (n=124, 95% bootstrap CI, n_resamples=10,000)
+  Metric             Point      95% CI              
+  --------------------------------------------------
+  Cls Accuracy       0.7339     [0.6532, 0.8065]
+  Span Exact         0.6935     [0.6129, 0.7742]
+  Span Overlap F1    0.8794     [0.8344, 0.9202]
+  Joint F1           0.7177     [0.6371, 0.7903]
+
+============================================================
+System G: BIO Token-Level Tagger (span extraction only)
+============================================================
+
+  Span Extraction (all examples):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.3597     0.7394      
+  Hindi        0.0806     0.7611      
+  Indonesian   0.2000     0.6511      
+  Spanish      0.3150     0.7623      
+  Telugu       0.0000     0.2749      
+  Overall      0.2521     0.6868      
+
+  Span Extraction (idiomatic only):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.3780     0.7521      
+  Hindi        0.1613     0.7308      
+  Indonesian   0.1806     0.6464      
+  Spanish      0.3307     0.7835      
+  Telugu       0.0000     0.3045      
+  Overall      0.2611     0.6949      
+
+  Span Extraction (literal only — diagnostic):
+  Language     Exact      Overlap F1  
+  ------------------------------------
+  English      0.3413     0.7267      
+  Hindi        0.0000     0.7914      
+  Indonesian   0.2176     0.6555      
+  Spanish      0.2992     0.7410      
+  Telugu       0.0000     0.2454      
+  Overall      0.2433     0.6788      
+
+  Joint accuracy (span exact match, no cls gate): 0.2521 (241/956)
+
+  Span-only Joint F1 (any overlap = correct): {'English': 0.4628, 'Hindi': 0.4876, 'Indonesian': 0.4538, 'Spanish': 0.4708, 'Telugu': 0.479, 'Overall': 0.4647}
+
+  Stability metrics (in-distribution languages):
+  Mean Joint F1:  0.4750
+  Std (langs):    0.0092   (lower = more stable)
+  Worst language: English = 0.4628
+  Best-Worst gap: 0.0248
+  Stability score (mean - std): 0.4658
+  Per-language: English=0.4628  Spanish=0.4708  Hindi=0.4876  Telugu=0.4790
+
+  Indonesian held-out generalization (n=325, 95% bootstrap CI)
+  Metric             Point      95% CI              
+  --------------------------------------------------
+  Span Exact         0.2000     [0.1569, 0.2462]
+  Span Overlap F1    0.6511     [0.6116, 0.6883]
+
+============================================================================================================
+SUMMARY — Full Pipeline Comparison (Overall)
+============================================================================================================
+System                                        Cls F1     E2E Span F1    Corr-ID Span F1  Joint Acc    Joint F1     Joint F1 (macro-avg)
+---------------------------------------------------------------------------------------------------------------------------------------
+A: mBERT Pipeline (S1→S2)                     0.7823     0.6571         0.8549           0.6464       0.7631       0.7486              
+B: GPT-4o Pipeline (S1→S2)                    0.7599     0.7097         0.8660           0.6527       0.7228       0.6915              
+C: GPT-4o Single-Stage                        0.7268     0.7466         0.8577           0.5837       0.7090       0.6977              
+D: mBERT S1 → Joint Span Head                 0.7823     0.6571         0.8549           0.6464       0.7631       0.7486              
+E: Joint mBERT (one-pass)                     0.7760     0.6566         0.8590           0.6475       0.7590       0.7381              
+F: Sequential mBERT (Ph1→Ph2)                 0.7741     0.6661         0.8526           0.6381       0.7530       0.7440              
+G: BIO Tagger (span only) *                   —          0.6949         0.6949           0.2521       0.4647       —                   
+  * System G has no classifier — Cls F1 and Joint metrics are span-only.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Classification Macro F1 — Per Language
+────────────────────────────────────────────────────────────────────────────────────────────────────────────
+System                                        English       Spanish       Hindi         Telugu        Overall   
+----------------------------------------------------------------------------------------------------------------
+A: mBERT Pipeline (S1→S2)                     0.8063        0.7432        0.6870        0.7898        0.7823    
+B: GPT-4o Pipeline (S1→S2)                    0.8023        0.7793        0.5989        0.7319        0.7599    
+C: GPT-4o Single-Stage                        0.7889        0.7817        0.5679        0.6830        0.7268    
+D: mBERT S1 → Joint Span Head                 0.8063        0.7432        0.6870        0.7898        0.7823    
+E: Joint mBERT (one-pass)                     0.7825        0.7677        0.6540        0.7903        0.7760    
+F: Sequential mBERT (Ph1→Ph2)                 0.7900        0.7756        0.6591        0.8046        0.7741    
+G: BIO Tagger (span only)                     —             —             —             —             —         
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────
+E2E Span Overlap F1 — Per Language  (idiomatic examples, cls errors zeroed)
+────────────────────────────────────────────────────────────────────────────────────────────────────────────
+System                                        English       Spanish       Hindi         Telugu        Overall   
+----------------------------------------------------------------------------------------------------------------
+A: mBERT Pipeline (S1→S2)                     0.7222        0.6117        0.5190        0.7552        0.6571    
+B: GPT-4o Pipeline (S1→S2)                    0.7245        0.7250        0.7521        0.7578        0.7097    
+C: GPT-4o Single-Stage                        0.7465        0.7524        0.8275        0.9243        0.7466    
+D: mBERT S1 → Joint Span Head                 0.7222        0.6117        0.5190        0.7552        0.6571    
+E: Joint mBERT (one-pass)                     0.6744        0.7047        0.4476        0.7190        0.6566    
+F: Sequential mBERT (Ph1→Ph2)                 0.6709        0.6776        0.4929        0.8221        0.6661    
+G: BIO Tagger (span only)                     0.7521        0.7835        0.7308        0.3045        0.6949    
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Joint F1 — Per Language  (macro-avg across in-distribution languages)
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+System                                        English       Spanish       Hindi         Telugu        Overall   
+----------------------------------------------------------------------------------------------------------------
+A: mBERT Pipeline (S1→S2)                     0.8023        0.7309        0.6870        0.7740        0.7486    
+B: GPT-4o Pipeline (S1→S2)                    0.7826        0.7520        0.5445        0.6870        0.6915    
+C: GPT-4o Single-Stage                        0.7697        0.7702        0.5679        0.6830        0.6977    
+D: mBERT S1 → Joint Span Head                 0.8023        0.7309        0.6870        0.7740        0.7486    
+E: Joint mBERT (one-pass)                     0.7745        0.7520        0.6357        0.7903        0.7381    
+F: Sequential mBERT (Ph1→Ph2)                 0.7819        0.7636        0.6418        0.7889        0.7440    
+G: BIO Tagger (span only)                     0.4628        0.4708        0.4876        0.4790        0.4647    
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Corr-ID Span Overlap F1 — Per Language  (span given correct classification)
+────────────────────────────────────────────────────────────────────────────────────────────────────────────
+System                                        English       Spanish       Hindi         Telugu        Overall   
+----------------------------------------------------------------------------------------------------------------
+A: mBERT Pipeline (S1→S2)                     0.9172        0.8929        0.9464        0.9005        0.8549    
+B: GPT-4o Pipeline (S1→S2)                    0.8933        0.8940        0.8327        0.8100        0.8660    
+C: GPT-4o Single-Stage                        0.8541        0.8608        0.8846        0.9243        0.8577    
+D: mBERT S1 → Joint Span Head                 0.9172        0.8929        0.9464        0.9005        0.8549    
+E: Joint mBERT (one-pass)                     0.8921        0.9040        0.8673        0.9287        0.8590    
+F: Sequential mBERT (Ph1→Ph2)                 0.9064        0.8871        0.8489        0.9102        0.8526    
+G: BIO Tagger (span only)                     0.7521        0.7835        0.7308        0.3045        0.6949    
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Stability Metrics — Joint F1 across In-Distribution Languages
+  (Stability = Mean − Std: higher = better average AND more consistent)
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+System                                        Mean       Std        Worst Lang       Worst F1     Gap        Stability   
+-------------------------------------------------------------------------------------------------------------------------
+A: mBERT Pipeline (S1→S2)                     0.7486     0.0437     Hindi            0.6870       0.1153     0.7049      
+B: GPT-4o Pipeline (S1→S2)                    0.6915     0.0916     Hindi            0.5445       0.2381     0.5999      
+C: GPT-4o Single-Stage                        0.6977     0.0829     Hindi            0.5679       0.2023     0.6148      
+D: mBERT S1 → Joint Span Head                 0.7486     0.0437     Hindi            0.6870       0.1153     0.7049      
+E: Joint mBERT (one-pass)                     0.7381     0.0607     Hindi            0.6357       0.1546     0.6774      
+F: Sequential mBERT (Ph1→Ph2)                 0.7440     0.0598     Hindi            0.6418       0.1471     0.6843      
+G: BIO Tagger (span only)                     0.4750     0.0092     English          0.4628       0.0248     0.4658      
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Indonesian Held-Out Generalization — 95% Bootstrap CIs  (n≈33 test examples)
+  Indonesian is excluded from all training; results are zero-shot cross-lingual transfer.
+────────────────────────────────────────────────────────────────────────────────────────────────────────────
+System                                        Cls Acc                Span Exact             Span Overlap           Joint F1              
+-----------------------------------------------------------------------------------------------------------------------------------------
+A: mBERT Pipeline (S1→S2)                       [no data]
+B: GPT-4o Pipeline (S1→S2)                      [no data]
+C: GPT-4o Single-Stage                          [no data]
+D: mBERT S1 → Joint Span Head                   [no data]
+E: Joint mBERT (one-pass)                       [no data]
+F: Sequential mBERT (Ph1→Ph2)                   [no data]
+G: BIO Tagger (span only)                     — (no cls)             0.2000 [0.1569,0.2462] 0.6511 [0.6116,0.6883] 0.6511 [0.6116,0.6883]
+
+Full results saved → /content/drive/MyDrive/IdiomBERT_Ablations/results/en_es_hi_te/pipeline_eval_results.json
