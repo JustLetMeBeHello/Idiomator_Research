@@ -1,0 +1,32 @@
+{
+  "fix": "N1_tost_equivalence",
+  "mode": "strip",
+  "reference": "wp",
+  "margin": 0.02,
+  "alpha": 0.05,
+  "n_bootstrap": 10000,
+  "seeds": [
+    42,
+    123,
+    7
+  ],
+  "seeds_found": {
+    "rembert": 3,
+    "xlmr": 3,
+    "mbert": 3,
+    "muril": 3
+  },
+  "sp_gap": 0.0245,
+  "wp_gap": 0.0285,
+  "difference": -0.004,
+  "ci_pct": 90,
+  "ci": [
+    -0.0194,
+    0.0115
+  ],
+  "p_lower": 0.0446,
+  "p_upper": 0.0045,
+  "p_tost": 0.0446,
+  "equivalent": true,
+  "paper_sentence": "A two one-sided tests (TOST) procedure with an equivalence margin of ±0.020 confirms the SentencePiece strip-normalised QA–BIO gap (+0.024) is statistically equivalent to the WordPiece reference (difference -0.004, 90% CI [-0.019, +0.012], TOST p = 0.045)."
+}
