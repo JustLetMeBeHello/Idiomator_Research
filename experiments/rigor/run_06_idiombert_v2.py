@@ -67,13 +67,16 @@ from sklearn.metrics import f1_score, classification_report
 from tqdm import tqdm
 
 import sys
-REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT))
+# Path predates the 2026-06-19 reorg (flat -> training/ + experiments/{rigor,ablations}/).
+# REPO_ROOT must resolve to the experiments/ repo root, then training/ holds Train_Join.py.
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(REPO_ROOT / 'training'))
 # Reuse data pipeline + alignment helpers from the existing trainer.
 from Train_Join import (
     LABEL2ID,
     ID2LABEL,
     char_to_token_span,
+    token_to_char_span,
     compute_overlap_f1,
     JointDataset,
     JointIdiomModel,
@@ -465,16 +468,34 @@ def evaluate_v2(model, loader, examples, device, split_name, args, tokenizer):
                 lang_cls_labels[lang].append(int(batch['cls_labels'][i]))
                 total += 1
 
+                # Convert token positions -> char offsets so this registers through
+                # Full_evaluation.py's --joint_preds path unchanged (same schema as
+                # Train_Join.py / System E: pred_idiomaticity, cls_correct,
+                # pred_span_start/end as CHAR offsets, not token indices — a script
+                # predating the 2026-06-19 reorg saved raw token indices here, which
+                # silently doesn't register; fixed alongside the import-path bug above).
+                pred_label = ID2LABEL[int(cls_preds[i])]
+                char_s, char_e = token_to_char_span(tokenizer, ex['sentence'], ps, pe, args.max_len)
+                if char_s is None:
+                    char_s, char_e = 0, 0
+                gold_char_s, gold_char_e = ex['span_start'], ex['span_end']
+                char_exact = bool(char_s == gold_char_s and char_e == gold_char_e)
+                char_f1 = compute_overlap_f1(char_s, char_e, gold_char_s, gold_char_e)
+
                 per_example_preds.append({
                     **{k: ex.get(k) for k in (
                         'language', 'idiom_id', 'idiom', 'meaning_id', 'sense_number',
                         'idiomaticity', 'sentence', 'span_start', 'span_end',
                         'matched_span')},
-                    'pred_cls':        ID2LABEL[int(cls_preds[i])],
-                    'pred_token_start': ps,
-                    'pred_token_end':   pe,
-                    'span_exact_match': exact,
-                    'span_overlap_f1':  round(f1, 4),
+                    'pred_idiomaticity': pred_label,
+                    'cls_correct':       bool(pred_label == ex['idiomaticity']),
+                    'pred_span_start':   char_s,
+                    'pred_span_end':     char_e,
+                    'pred_matched_span': ex['sentence'][char_s:char_e] if char_s is not None else '',
+                    'pred_token_start':  ps,
+                    'pred_token_end':    pe,
+                    'span_exact_match':  char_exact,
+                    'span_overlap_f1':   round(char_f1, 4),
                 })
 
     macro_f1 = f1_score(all_cls_labels, all_cls_preds, average='macro')
