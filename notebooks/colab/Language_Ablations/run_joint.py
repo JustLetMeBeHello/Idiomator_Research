@@ -73,11 +73,20 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--batch",       default="32")
     p.add_argument("--cls_weight",  default="0.3")
     p.add_argument("--span_weight", default="1.9")
+    p.add_argument("--seed",        default="42",
+                    help="Training seed. seed=42 writes to the canonical joint_mbert/ dir; "
+                         "any other seed writes to joint_mbert_s{seed}/ so the single-seed-42 "
+                         "matrix is never overwritten. Threaded to Train_Join.py --seed.")
     return p.parse_args()
 
 
+def joint_subdir(args: argparse.Namespace) -> str:
+    return "joint_mbert" if str(args.seed) == "42" else f"joint_mbert_s{args.seed}"
+
+
 def checkpoint_path(args: argparse.Namespace, job: Job) -> Path:
-    return Path(args.checkpoint_dir) / f"{job.name}.json"
+    suffix = "" if str(args.seed) == "42" else f"__s{args.seed}"
+    return Path(args.checkpoint_dir) / f"{job.name}{suffix}.json"
 
 
 def checkpoint_done(args: argparse.Namespace, job: Job) -> bool:
@@ -92,7 +101,7 @@ def checkpoint_done(args: argparse.Namespace, job: Job) -> bool:
 
 
 def expected_done(args: argparse.Namespace, job: Job) -> bool:
-    base = Path(args.ablation_dir) / job.combo / "joint_mbert"
+    base = Path(args.ablation_dir) / job.combo / joint_subdir(args)
     return (base / "metrics.json").exists() and (base / "test_predictions.jsonl").exists()
 
 
@@ -132,6 +141,7 @@ def main() -> None:
         Path(d).mkdir(parents=True, exist_ok=True)
 
     print(f"System        : {SYSTEM}")
+    print(f"Seed          : {args.seed}  (out dir: {joint_subdir(args)})")
     print(f"Root          : {args.root}")
     print(f"Device        : {args.device}")
 
@@ -153,12 +163,12 @@ def main() -> None:
             cp = checkpoint_path(args, job)
             if cp.exists():
                 cp.unlink()
-            out_dir = Path(args.ablation_dir) / job.combo / "joint_mbert"
+            out_dir = Path(args.ablation_dir) / job.combo / joint_subdir(args)
             if out_dir.exists():
                 shutil.rmtree(out_dir)
                 tqdm.write(f"  force: deleted stale {out_dir}")
 
-        out = str(Path(args.ablation_dir) / job.combo / "joint_mbert")
+        out = str(Path(args.ablation_dir) / job.combo / joint_subdir(args))
         cmd = [
             args.python, "-u", "training/Train_Join.py",
             "--model_name",     args.model_name,
@@ -172,6 +182,7 @@ def main() -> None:
             "--lr",             args.lr,
             "--cls_loss_weight",  args.cls_weight,
             "--span_loss_weight", args.span_weight,
+            "--seed",             args.seed,
         ]
         run_live(args, job, cmd)
         mark_done(args, job)
