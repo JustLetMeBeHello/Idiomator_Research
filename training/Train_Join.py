@@ -81,6 +81,11 @@ def parse_args():
     p.add_argument('--test_langs', nargs='+', default=None,
     help='Languages to evaluate on. Defaults to --langs. Use all target languages for cross-lingual ablations.'
 )
+    p.add_argument('--select_dev_lang', default=None,
+    help='If set (e.g. "Hindi"), pick the best checkpoint on that single language\'s dev joint F1 '
+         'instead of the pooled-over-all-langs dev joint F1. Removes the dev-pool-composition confound '
+         'when comparing combos that differ in which languages are included.'
+)
     p.add_argument('--epochs',          type=int,   default=7)
     p.add_argument('--batch_size',      type=int,   default=32)
     p.add_argument('--lr',              type=float, default=2e-05)
@@ -458,14 +463,16 @@ def evaluate(model, loader, tokenizer, examples, device, split_name, max_len):
     print(f"Total examples: {total}\n")
 
     print("Per-language breakdown:")
+    per_lang = {}
     for lang in sorted(lang_exact.keys()):
         lf1  = f1_score(lang_cls_labels[lang], lang_cls_preds[lang], average='macro')
-        le   = np.mean(lang_exact[lang])
-        lf   = np.mean(lang_f1[lang])
+        le   = float(np.mean(lang_exact[lang]))
+        lf   = float(np.mean(lang_f1[lang]))
         n    = len(lang_exact[lang])
+        per_lang[lang] = {'cls_macro_f1': float(lf1), 'span_exact': le, 'span_overlap_f1': lf, 'n': n}
         print(f"  {lang:10s}  cls_macro_F1={lf1:.4f}  span_exact={le:.4f}  span_overlap_F1={lf:.4f}  ({n} examples)")
 
-    return macro_f1, exact_match, avg_overlap, all_cls_preds, all_cls_labels
+    return macro_f1, exact_match, avg_overlap, all_cls_preds, all_cls_labels, per_lang
 
 
 # ── Train ─────────────────────────────────────────────────────────────────────
@@ -521,7 +528,9 @@ def train(args):
                    name=Path(args.output_dir).name)
 
     best_dev_joint_f1 = 0.0   # optimise for joint F1 = geomean(cls_macro_f1, span_overlap_f1)
+    best_selection_score = 0.0  # the score actually gating checkpoint selection (see --select_dev_lang)
     best_epoch        = 0
+    dev_history       = []    # per-epoch, per-language dev metrics — dumped to dev_history.jsonl
 
     for epoch in range(1, args.epochs + 1):
         model.train()
@@ -590,7 +599,7 @@ def train(args):
         avg_loss = total_loss / len(train_loader)
         print(f"\nEpoch {epoch} avg loss: {avg_loss:.4f}")
 
-        dev_cls_f1, dev_exact, dev_overlap, _, _ = evaluate(
+        dev_cls_f1, dev_exact, dev_overlap, _, _, dev_per_lang = evaluate(
             model, dev_loader, tokenizer, dev_ds.valid_examples,
             device, f'Dev (epoch {epoch})', args.max_len
         )
@@ -598,8 +607,32 @@ def train(args):
         # Joint F1 = geometric mean of cls macro F1 and span overlap F1
         # Geometric mean penalises models that sacrifice one task for the other
         import math
-        dev_joint_f1 = math.sqrt(dev_cls_f1 * dev_overlap) if (dev_cls_f1 > 0 and dev_overlap > 0) else 0.0
+        def _joint(cls, overlap):
+            return math.sqrt(cls * overlap) if (cls > 0 and overlap > 0) else 0.0
+        dev_joint_f1 = _joint(dev_cls_f1, dev_overlap)
         print(f"  Dev joint F1 (geomean): {dev_joint_f1:.4f}  (cls={dev_cls_f1:.4f}, span_overlap={dev_overlap:.4f})")
+
+        # Checkpoint-selection score: single-language dev joint F1 if --select_dev_lang,
+        # else the pooled dev joint F1 (original behaviour).
+        if args.select_dev_lang:
+            pl = dev_per_lang.get(args.select_dev_lang)
+            if pl is None:
+                raise ValueError(
+                    f"--select_dev_lang={args.select_dev_lang!r} not present in dev set "
+                    f"(dev langs: {sorted(dev_per_lang)})")
+            selection_score = _joint(pl['cls_macro_f1'], pl['span_overlap_f1'])
+            print(f"  Selection score (dev {args.select_dev_lang} joint F1): {selection_score:.4f}")
+        else:
+            selection_score = dev_joint_f1
+
+        dev_history.append({
+            'epoch': epoch, 'train_loss': avg_loss,
+            'dev_joint_f1_pooled': dev_joint_f1,
+            'dev_cls_f1_pooled': dev_cls_f1, 'dev_span_overlap_pooled': dev_overlap,
+            'selection_score': selection_score,
+            'select_dev_lang': args.select_dev_lang,
+            'per_lang': dev_per_lang,
+        })
 
         if WANDB and args.use_wandb:
             wandb.log({
@@ -611,19 +644,28 @@ def train(args):
                 'dev_joint_f1':    dev_joint_f1,
             })
 
-        if dev_joint_f1 > best_dev_joint_f1:
-            best_dev_joint_f1 = dev_joint_f1
-            best_epoch        = epoch
+        if selection_score > best_selection_score:
+            best_selection_score = selection_score
+            best_dev_joint_f1    = dev_joint_f1
+            best_epoch           = epoch
             save_model(model, tokenizer, output_dir)
-            print(f"  ✓ New best model saved (dev joint F1: {best_dev_joint_f1:.4f})")
+            print(f"  ✓ New best model saved (selection score: {best_selection_score:.4f}, "
+                  f"pooled dev joint F1: {best_dev_joint_f1:.4f})")
 
-    print(f"\nBest dev joint F1: {best_dev_joint_f1:.4f} at epoch {best_epoch}")
+    # Persist per-epoch dev history so the selection-vs-interference confound is auditable
+    # after the fact without a retrain (see --select_dev_lang).
+    with open(output_dir / 'dev_history.jsonl', 'w') as f:
+        for rec in dev_history:
+            f.write(json.dumps(rec) + '\n')
+
+    print(f"\nBest dev joint F1: {best_dev_joint_f1:.4f} at epoch {best_epoch} "
+          f"(selected on: {args.select_dev_lang or 'pooled'})")
 
     # Final test eval
     print("\nLoading best model for test evaluation...")
     best_model = load_best_model(args.model_name, output_dir, device)
 
-    test_cls_f1, test_exact, test_overlap, test_preds, test_labels = evaluate(
+    test_cls_f1, test_exact, test_overlap, test_preds, test_labels, _ = evaluate(
         best_model, test_loader, tokenizer, test_ds.valid_examples,
         device, 'Test (final)', args.max_len
     )
@@ -689,6 +731,8 @@ def train(args):
     metrics = {
         'best_dev_cls_f1':   dev_cls_f1,
         'best_dev_joint_f1': best_dev_joint_f1,
+        'best_selection_score': best_selection_score,
+        'select_dev_lang':   args.select_dev_lang,
         'best_epoch':        best_epoch,
         'test_cls_macro_f1': test_cls_f1,
         'test_span_exact':   test_exact,

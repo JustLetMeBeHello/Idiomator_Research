@@ -77,15 +77,24 @@ def parse_args() -> argparse.Namespace:
                     help="Training seed. seed=42 writes to the canonical joint_mbert/ dir; "
                          "any other seed writes to joint_mbert_s{seed}/ so the single-seed-42 "
                          "matrix is never overwritten. Threaded to Train_Join.py --seed.")
+    p.add_argument("--select_dev_lang", default=None,
+                    help="Threaded to Train_Join.py --select_dev_lang. If set (e.g. Hindi), picks the "
+                         "checkpoint on that single language's dev joint F1 instead of pooled dev, "
+                         "removing the dev-pool-composition confound in cross-combo comparisons.")
     return p.parse_args()
 
 
 def joint_subdir(args: argparse.Namespace) -> str:
-    return "joint_mbert" if str(args.seed) == "42" else f"joint_mbert_s{args.seed}"
+    base = "joint_mbert" if str(args.seed) == "42" else f"joint_mbert_s{args.seed}"
+    # A dev-lang-selected run is a DIFFERENT model than the pooled-selected one — never let
+    # them collide in the same dir, or one silently overwrites the other's canonical output.
+    return base if not args.select_dev_lang else f"{base}_dev{args.select_dev_lang}"
 
 
 def checkpoint_path(args: argparse.Namespace, job: Job) -> Path:
     suffix = "" if str(args.seed) == "42" else f"__s{args.seed}"
+    if args.select_dev_lang:
+        suffix += f"__dev{args.select_dev_lang}"
     return Path(args.checkpoint_dir) / f"{job.name}{suffix}.json"
 
 
@@ -184,6 +193,8 @@ def main() -> None:
             "--span_loss_weight", args.span_weight,
             "--seed",             args.seed,
         ]
+        if args.select_dev_lang:
+            cmd += ["--select_dev_lang", args.select_dev_lang]
         run_live(args, job, cmd)
         mark_done(args, job)
         completed += 1

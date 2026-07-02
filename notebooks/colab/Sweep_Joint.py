@@ -46,10 +46,11 @@ FIXED = {
     'seed':       42,
 }
 
-# Output dirs
-SWEEP_DIR    = Path('sweep_results')
-STUDY_DB     = SWEEP_DIR / 'optuna_study.db'
-SUMMARY_PATH = SWEEP_DIR / 'summary.jsonl'
+# Output dirs — set in main() from args, since a sweep over a different --langs set
+# must not collide with (or silently reuse) the original En+Hi+Te sweep's results.
+SWEEP_DIR    = None
+STUDY_DB     = None
+SUMMARY_PATH = None
 
 
 # ── Args ──────────────────────────────────────────────────────────────────────
@@ -66,6 +67,13 @@ def parse_args():
                    help='Enable MedianPruner to cut bad trials early')
     p.add_argument('--timeout',      type=int,   default=None,
                    help='Stop after this many seconds regardless of n_trials')
+    p.add_argument('--langs',        nargs='+',  default=['English', 'Hindi', 'Telugu'],
+                   help='Languages to sweep on (overrides FIXED default). The original sweep '
+                        'used En+Hi+Te only — resweep on a different combo (e.g. adding Spanish) '
+                        'before trusting its HPs for that combo.')
+    p.add_argument('--sweep_dir',    default=None,
+                   help='Output dir. Defaults to sweep_results_<study_name> so different --langs '
+                        'sweeps never collide.')
     return p.parse_args()
 
 
@@ -101,7 +109,7 @@ def sample_config(trial: optuna.Trial) -> dict:
 
 # ── Trial runner ──────────────────────────────────────────────────────────────
 
-def run_trial(config: dict, trial_dir: Path, train_script: str) -> dict | None:
+def run_trial(config: dict, trial_dir: Path, train_script: str, langs: list) -> dict | None:
     """Run one trial of training/Train_Join.py and return its metrics dict."""
     trial_dir.mkdir(parents=True, exist_ok=True)
 
@@ -110,7 +118,7 @@ def run_trial(config: dict, trial_dir: Path, train_script: str) -> dict | None:
         '--output_dir',       str(trial_dir),
         '--model_name',       FIXED['model_name'],
         '--data_dir',         FIXED['data_dir'],
-        '--langs',            *FIXED['langs'],
+        '--langs',            *langs,
         '--max_len',          str(FIXED['max_len']),
         '--seed',             str(FIXED['seed']),
         '--lr',               str(config['lr']),
@@ -153,7 +161,7 @@ def make_objective(args):
         print(f"{'='*70}")
 
         t0      = time.time()
-        metrics = run_trial(config, trial_dir, args.train_script)
+        metrics = run_trial(config, trial_dir, args.train_script, args.langs)
         elapsed = time.time() - t0
 
         if metrics is None:
@@ -203,7 +211,12 @@ def make_objective(args):
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
+    global SWEEP_DIR, STUDY_DB, SUMMARY_PATH
     args = parse_args()
+
+    SWEEP_DIR    = Path(args.sweep_dir or f'sweep_results_{args.study_name}')
+    STUDY_DB     = SWEEP_DIR / 'optuna_study.db'
+    SUMMARY_PATH = SWEEP_DIR / 'summary.jsonl'
     SWEEP_DIR.mkdir(parents=True, exist_ok=True)
 
     pruner  = MedianPruner(n_startup_trials=5, n_warmup_steps=2) if args.pruning else optuna.pruners.NopPruner()
@@ -220,6 +233,7 @@ def main():
     )
 
     print(f"Study: {args.study_name}")
+    print(f"Langs: {args.langs}")
     print(f"DB:    {STUDY_DB}")
     print(f"Optimising: dev joint F1 = geomean(cls_macro_f1, span_overlap_f1)")
     print(f"Running {args.n_trials} trials...\n")
@@ -244,6 +258,7 @@ def main():
 
     best_out = {
         'study_name':       args.study_name,
+        'langs':            args.langs,
         'best_trial':       best.number,
         'best_dev_joint_f1': best.value,
         'best_dev_cls_f1':  best.user_attrs.get('dev_cls_f1'),
