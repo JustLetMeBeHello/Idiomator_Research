@@ -214,11 +214,15 @@ class SpanOnlyModel(torch.nn.Module):
         end_logits   = end_logits.masked_fill(~mask,   float('-inf'))
         return start_logits, end_logits
 
-BASE_ENCODER = 'bert-base-multilingual-cased'  # best_model/ only stores fine-tuned task heads, not encoder weights
+BASE_ENCODER = 'bert-base-multilingual-cased'  # fallback only — used when best_model/ has no saved encoder
+
+def _encoder_source(best: Path) -> str:
+    has_encoder = (best / 'model.safetensors').exists() or (best / 'pytorch_model.bin').exists()
+    return str(best) if has_encoder else BASE_ENCODER
 
 def load_joint_model(joint_dir, device):
     best = Path(joint_dir) / 'best_model'
-    model = JointIdiomModel(BASE_ENCODER)
+    model = JointIdiomModel(_encoder_source(best))
     heads = torch.load(best / 'task_heads.pt', map_location='cpu', weights_only=True)
     model.cls_head.load_state_dict(heads['cls_head'])
     model.start_head.load_state_dict(heads['start_head'])
@@ -227,7 +231,7 @@ def load_joint_model(joint_dir, device):
 
 def load_span_model(stage2_dir, device):
     best = Path(stage2_dir) / 'best_model'
-    model = SpanOnlyModel(BASE_ENCODER)
+    model = SpanOnlyModel(_encoder_source(best))
     heads = torch.load(best / 'span_heads.pt', map_location='cpu', weights_only=True)
     model.start_head.load_state_dict(heads['start_head'])
     model.end_head.load_state_dict(heads['end_head'])
