@@ -1,0 +1,264 @@
+{
+  "conditions": [
+    {
+      "label": "BASELINE joint, raw spans, overlap>0 (reproduces headline N2)",
+      "normalize": false,
+      "span_mode": "joint",
+      "threshold": "0.0",
+      "rows": [
+        {
+          "lang": "Indonesian",
+          "n": 325,
+          "mbert_f1": 0.7565,
+          "gpt_f1": 0.6373,
+          "diff": 0.1192,
+          "ci": [
+            0.0588,
+            0.1817
+          ],
+          "p_raw": 0.0,
+          "p_holm": 0.0,
+          "sig_holm": true
+        },
+        {
+          "lang": "French",
+          "n": 800,
+          "mbert_f1": 0.7824,
+          "gpt_f1": 0.6701,
+          "diff": 0.1124,
+          "ci": [
+            0.0736,
+            0.1516
+          ],
+          "p_raw": 0.0,
+          "p_holm": 0.0,
+          "sig_holm": true
+        },
+        {
+          "lang": "German",
+          "n": 800,
+          "mbert_f1": 0.7636,
+          "gpt_f1": 0.672,
+          "diff": 0.0916,
+          "ci": [
+            0.0502,
+            0.1336
+          ],
+          "p_raw": 0.0,
+          "p_holm": 0.0,
+          "sig_holm": true
+        }
+      ],
+      "n_sig_holm": 3,
+      "family_size": 3
+    },
+    {
+      "label": "SYMMETRIC-NORM joint, overlap>0 (both systems stripped identically)",
+      "normalize": true,
+      "span_mode": "joint",
+      "threshold": "0.0",
+      "rows": [
+        {
+          "lang": "Indonesian",
+          "n": 325,
+          "mbert_f1": 0.7565,
+          "gpt_f1": 0.6373,
+          "diff": 0.1192,
+          "ci": [
+            0.0588,
+            0.1817
+          ],
+          "p_raw": 0.0,
+          "p_holm": 0.0,
+          "sig_holm": true
+        },
+        {
+          "lang": "French",
+          "n": 800,
+          "mbert_f1": 0.7824,
+          "gpt_f1": 0.6701,
+          "diff": 0.1124,
+          "ci": [
+            0.0736,
+            0.1516
+          ],
+          "p_raw": 0.0,
+          "p_holm": 0.0,
+          "sig_holm": true
+        },
+        {
+          "lang": "German",
+          "n": 800,
+          "mbert_f1": 0.7636,
+          "gpt_f1": 0.672,
+          "diff": 0.0916,
+          "ci": [
+            0.0502,
+            0.1336
+          ],
+          "p_raw": 0.0,
+          "p_holm": 0.0,
+          "sig_holm": true
+        }
+      ],
+      "n_sig_holm": 3,
+      "family_size": 3
+    },
+    {
+      "label": "SYMMETRIC-NORM joint, overlap>=0.5 (strict, boundary-sensitive)",
+      "normalize": true,
+      "span_mode": "joint",
+      "threshold": "0.5",
+      "rows": [
+        {
+          "lang": "Indonesian",
+          "n": 325,
+          "mbert_f1": 0.7311,
+          "gpt_f1": 0.6051,
+          "diff": 0.126,
+          "ci": [
+            0.0635,
+            0.1903
+          ],
+          "p_raw": 0.0002,
+          "p_holm": 0.0004,
+          "sig_holm": true
+        },
+        {
+          "lang": "French",
+          "n": 800,
+          "mbert_f1": 0.7583,
+          "gpt_f1": 0.6377,
+          "diff": 0.1206,
+          "ci": [
+            0.0817,
+            0.1611
+          ],
+          "p_raw": 0.0,
+          "p_holm": 0.0,
+          "sig_holm": true
+        },
+        {
+          "lang": "German",
+          "n": 800,
+          "mbert_f1": 0.7437,
+          "gpt_f1": 0.663,
+          "diff": 0.0808,
+          "ci": [
+            0.0392,
+            0.1226
+          ],
+          "p_raw": 0.0004,
+          "p_holm": 0.0004,
+          "sig_holm": true
+        }
+      ],
+      "n_sig_holm": 3,
+      "family_size": 3
+    },
+    {
+      "label": "SYMMETRIC-NORM joint, EXACT-after-norm (hardest span)",
+      "normalize": true,
+      "span_mode": "joint",
+      "threshold": "exact",
+      "rows": [
+        {
+          "lang": "Indonesian",
+          "n": 325,
+          "mbert_f1": 0.5796,
+          "gpt_f1": 0.563,
+          "diff": 0.0165,
+          "ci": [
+            -0.0547,
+            0.0888
+          ],
+          "p_raw": 0.6448,
+          "p_holm": 0.6448,
+          "sig_holm": false
+        },
+        {
+          "lang": "French",
+          "n": 800,
+          "mbert_f1": 0.649,
+          "gpt_f1": 0.4919,
+          "diff": 0.1571,
+          "ci": [
+            0.1152,
+            0.2001
+          ],
+          "p_raw": 0.0,
+          "p_holm": 0.0,
+          "sig_holm": true
+        },
+        {
+          "lang": "German",
+          "n": 800,
+          "mbert_f1": 0.5664,
+          "gpt_f1": 0.5295,
+          "diff": 0.0369,
+          "ci": [
+            -0.0093,
+            0.083
+          ],
+          "p_raw": 0.118,
+          "p_holm": 0.236,
+          "sig_holm": false
+        }
+      ],
+      "n_sig_holm": 1,
+      "family_size": 3
+    },
+    {
+      "label": "CLS-ONLY, span-agnostic (decisive: if mBERT still wins, not a span artifact)",
+      "normalize": false,
+      "span_mode": "cls_only",
+      "threshold": "0.0",
+      "rows": [
+        {
+          "lang": "Indonesian",
+          "n": 325,
+          "mbert_f1": 0.8,
+          "gpt_f1": 0.6662,
+          "diff": 0.1338,
+          "ci": [
+            0.0752,
+            0.1959
+          ],
+          "p_raw": 0.0,
+          "p_holm": 0.0,
+          "sig_holm": true
+        },
+        {
+          "lang": "French",
+          "n": 800,
+          "mbert_f1": 0.7987,
+          "gpt_f1": 0.685,
+          "diff": 0.1137,
+          "ci": [
+            0.0748,
+            0.1536
+          ],
+          "p_raw": 0.0,
+          "p_holm": 0.0,
+          "sig_holm": true
+        },
+        {
+          "lang": "German",
+          "n": 800,
+          "mbert_f1": 0.7882,
+          "gpt_f1": 0.6776,
+          "diff": 0.1106,
+          "ci": [
+            0.0696,
+            0.1521
+          ],
+          "p_raw": 0.0,
+          "p_holm": 0.0,
+          "sig_holm": true
+        }
+      ],
+      "n_sig_holm": 3,
+      "family_size": 3
+    }
+  ]
+}
