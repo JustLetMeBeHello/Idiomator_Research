@@ -26,6 +26,8 @@ def parse_args():
     p.add_argument('--max_len',     type=int, default=128)
     p.add_argument('--batch_size',  type=int, default=32)
     p.add_argument('--device',      default=None)
+    p.add_argument('--joint_only',  action='store_true',
+                    help='Skip stage1/stage2 runners (no stage1_dir/stage2_dir checkpoints needed)')
     return p.parse_args()
 
 # ── Device ────────────────────────────────────────────────────────────────────
@@ -212,11 +214,12 @@ class SpanOnlyModel(torch.nn.Module):
         end_logits   = end_logits.masked_fill(~mask,   float('-inf'))
         return start_logits, end_logits
 
+BASE_ENCODER = 'bert-base-multilingual-cased'  # best_model/ only stores fine-tuned task heads, not encoder weights
+
 def load_joint_model(joint_dir, device):
     best = Path(joint_dir) / 'best_model'
-    model      = JointIdiomModel(str(best))
-    model.bert = AutoModel.from_pretrained(str(best))
-    heads      = torch.load(best / 'task_heads.pt', map_location='cpu')
+    model = JointIdiomModel(BASE_ENCODER)
+    heads = torch.load(best / 'task_heads.pt', map_location='cpu', weights_only=True)
     model.cls_head.load_state_dict(heads['cls_head'])
     model.start_head.load_state_dict(heads['start_head'])
     model.end_head.load_state_dict(heads['end_head'])
@@ -224,9 +227,8 @@ def load_joint_model(joint_dir, device):
 
 def load_span_model(stage2_dir, device):
     best = Path(stage2_dir) / 'best_model'
-    model = SpanOnlyModel(str(best))
-    model.bert = AutoModel.from_pretrained(str(best))
-    heads = torch.load(best / 'span_heads.pt', map_location='cpu')
+    model = SpanOnlyModel(BASE_ENCODER)
+    heads = torch.load(best / 'span_heads.pt', map_location='cpu', weights_only=True)
     model.start_head.load_state_dict(heads['start_head'])
     model.end_head.load_state_dict(heads['end_head'])
     return model.to(device)
@@ -331,7 +333,6 @@ def run_stage2(examples, args, device):
     print(f"Saved → {out_path}")
 
 def run_joint(examples, args, device):
-    # (Kept original run_joint logic but removed the redundant Stage 2 file save)
     print("\n" + "="*60)
     print("JOINT mBERT — cls + span on shared test.jsonl")
     print("="*60)
@@ -344,10 +345,9 @@ def run_joint(examples, args, device):
     dataset = SpanDataset(examples, tokenizer, args.max_len)
     loader  = DataLoader(dataset, batch_size=args.batch_size)
     valid   = dataset.valid_examples
+    labels  = [LABEL2ID[ex['idiomaticity']] for ex in valid]
 
-    cls_preds_all, cls_labels_all = [], []
-    span_results = []
-
+    records = []
     with torch.no_grad():
         for batch_idx, batch in enumerate(tqdm(loader, desc='Joint inference')):
             cls_logits, start_logits, end_logits = model(
@@ -355,13 +355,49 @@ def run_joint(examples, args, device):
                 attention_mask=batch['attention_mask'].to(device),
                 token_type_ids=batch['token_type_ids'].to(device),
             )
-            # Re-running logic to align with original script output format
-            # ... (truncated for brevity, logic remains same as provided script)
-            pass
+            cls_preds   = torch.argmax(cls_logits, dim=-1).cpu().numpy()
+            pred_starts = torch.argmax(start_logits, dim=-1).cpu().numpy()
+            pred_ends   = torch.argmax(end_logits,   dim=-1).cpu().numpy()
 
-    # Save joint predictions
+            batch_start = batch_idx * args.batch_size
+            for i in range(len(cls_preds)):
+                ex_idx = batch_start + i
+                if ex_idx >= len(valid):
+                    break
+                ex = valid[ex_idx]
+
+                pred_s = int(pred_starts[i])
+                pred_e = int(pred_ends[i])
+                if pred_e < pred_s:
+                    pred_e = pred_s
+
+                pred_char_s, pred_char_e = token_to_char_span(
+                    tokenizer, ex['sentence'], pred_s, pred_e, args.max_len
+                )
+                if pred_char_s is None:
+                    pred_char_s, pred_char_e = 0, 0
+
+                records.append({
+                    **ex,
+                    'pred_idiomaticity': ID2LABEL[int(cls_preds[i])],
+                    'correct':           bool(cls_preds[i] == labels[ex_idx]),
+                    'pred_span_start':   pred_char_s,
+                    'pred_span_end':     pred_char_e,
+                    'exact_match':       bool(pred_char_s == ex['span_start'] and pred_char_e == ex['span_end']),
+                    'overlap_f1':        round(compute_overlap_f1(pred_char_s, pred_char_e, ex['span_start'], ex['span_end']), 4),
+                })
+
+    cls_acc  = np.mean([r['correct'] for r in records])
+    exact    = np.mean([r['exact_match'] for r in records])
+    overlap  = np.mean([r['overlap_f1'] for r in records])
+    print(f"Cls accuracy:     {cls_acc:.4f}")
+    print(f"Span exact match: {exact:.4f}")
+    print(f"Overlap F1:       {overlap:.4f}")
+
     joint_path = Path(args.joint_dir) / 'test_predictions_shared.jsonl'
-    # (Writing logic remains same)
+    with open(joint_path, 'w', encoding='utf-8') as f:
+        for r in records:
+            f.write(json.dumps(r, ensure_ascii=False) + '\n')
     print(f"Saved → {joint_path}")
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -374,8 +410,9 @@ def main():
     examples = [json.loads(l) for l in open(args.test_path, encoding='utf-8')]
     print(f"Shared test set: {len(examples)} examples")
 
-    run_stage1(examples, args, device)
-    run_stage2(examples, args, device) # Now runs the actual Stage 2 model
+    if not args.joint_only:
+        run_stage1(examples, args, device)
+        run_stage2(examples, args, device) # Now runs the actual Stage 2 model
     run_joint(examples, args, device)
 
     print("\n" + "="*60)
