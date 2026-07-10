@@ -271,6 +271,7 @@ def list_annotators():
 @app.get("/export/{annotator}")
 def export_annotator(annotator: str, lang: str | None = None):
     """Download a specific annotator's annotations as JSONL."""
+    annotator = _normalize_annotator(annotator)
     db = SessionLocal()
     try:
         q = db.query(AnnotationDB).filter(AnnotationDB.annotator == annotator)
@@ -300,10 +301,18 @@ def _normalize_language(lang: str) -> str:
     return re.sub(r'_[A-Za-z]$', '', lang)
 
 
+def _normalize_annotator(name: str) -> str:
+    """Case/whitespace-fold so 'Shishir' and 'shishir' are the same identity."""
+    return name.strip().lower()
+
+
 @app.post("/save")
 def save_annotation(annotation: Annotation):
     """Upsert one annotation record, keyed on (annotator, meaning_id, language)."""
-    annotation = annotation.model_copy(update={'language': _normalize_language(annotation.language)})
+    annotation = annotation.model_copy(update={
+        'language': _normalize_language(annotation.language),
+        'annotator': _normalize_annotator(annotation.annotator),
+    })
     db = SessionLocal()
     try:
         existing = (
