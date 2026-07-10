@@ -1415,7 +1415,10 @@ async function submitExample() {
     idiom_id:                ex.idiom_id,
     annotator,
     session_id:              sessionId,
-    language:                ex.language,
+    // Store the selected pack (e.g. "Telugu_IAA"), NOT ex.language: IAA pool
+    // rows carry an internal language of "Telugu", which would misfile every
+    // IAA annotation under the plain Telugu set and break progress/export.
+    language:                currentLang,
     idiom:                   ex.idiom,
     sentence:                ex.sentence,
     original_idiomaticity:   ex.idiomaticity,
