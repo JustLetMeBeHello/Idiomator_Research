@@ -302,10 +302,21 @@ def _normalize_language(lang: str) -> str:
 
 @app.post("/save")
 def save_annotation(annotation: Annotation):
-    """Upsert one annotation record."""
+    """Upsert one annotation record, keyed on (annotator, meaning_id, language)."""
     annotation = annotation.model_copy(update={'language': _normalize_language(annotation.language)})
     db = SessionLocal()
     try:
+        existing = (
+            db.query(AnnotationDB.annotation_id)
+            .filter(
+                AnnotationDB.annotator == annotation.annotator,
+                AnnotationDB.meaning_id == annotation.meaning_id,
+                AnnotationDB.language == annotation.language,
+            )
+            .first()
+        )
+        if existing is not None:
+            annotation = annotation.model_copy(update={'annotation_id': existing.annotation_id})
         row = AnnotationDB(**annotation.model_dump())
         db.merge(row)
         db.commit()
@@ -325,8 +336,8 @@ def save_annotation(annotation: Annotation):
 
 # ── Error Review endpoints (Table 9 §9 error analysis) ─────────────────────────
 
-CANDIDATES_PATH = HERE.parent / "experiments/rigor/results/error_analysis_candidates.jsonl"
-DECISIONS_PATH  = HERE.parent / "experiments/rigor/results/error_review_decisions.json"
+CANDIDATES_PATH = HERE.parent.parent / "experiments/rigor/results/error_analysis_candidates.jsonl"
+DECISIONS_PATH  = HERE.parent.parent / "experiments/rigor/results/error_review_decisions.json"
 
 
 class ErrorDecision(BaseModel):

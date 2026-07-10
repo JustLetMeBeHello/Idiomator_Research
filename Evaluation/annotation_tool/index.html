@@ -996,6 +996,15 @@ async function drainQueue() {
   }
 }
 
+// Block tab close/refresh/nav while annotations are still unsynced — a
+// cleared cache or closed tab wipes idiombank_pending_v1, losing them for good.
+window.addEventListener('beforeunload', (e) => {
+  if (loadPending().length > 0) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
 
 // ════════════════════════════════════════════════════════════════════════════
 // Screen switching
@@ -1072,7 +1081,7 @@ async function loadLanguage(lang) {
   currentLang = lang;
   results = {};  // fresh results per language session (kept separate in localStorage by lang)
 
-  // Try to restore saved progress for this language
+  // Try to restore saved progress for this language (this device only)
   try {
     const saved = JSON.parse(localStorage.getItem(STORE_KEY + '_' + lang) || '{}');
     if (saved.results) results = saved.results;
@@ -1096,6 +1105,29 @@ async function loadLanguage(lang) {
 
   allExamples = examples;
   allExamples.forEach((e, i) => { e._idx = i; });
+
+  // Restore this annotator's already-submitted items from the server, keyed by
+  // meaning_id — localStorage alone only covers this browser/device, so a
+  // second device (or a cleared cache) would otherwise re-show already-done
+  // items as blank. Since /save mints a fresh annotation_id per submit
+  // (no upsert-by-item), re-submitting a "done" item creates a duplicate DB
+  // row instead of overwriting it — this restore is what prevents that.
+  try {
+    const resp = await fetch(`${API}/export/${encodeURIComponent(annotator)}`, { signal: AbortSignal.timeout(4000) });
+    if (resp.ok) {
+      const text = await resp.text();
+      const byMeaningId = {};
+      text.trim().split('\n').filter(Boolean).forEach(l => {
+        const rec = JSON.parse(l);
+        if (rec.language === lang) byMeaningId[rec.meaning_id] = rec;
+      });
+      allExamples.forEach(e => {
+        const rec = byMeaningId[e.meaning_id];
+        if (rec && !results[e._idx]) results[e._idx] = rec;
+      });
+    }
+  } catch(e) {}
+
   filterLang  = 'All';
   applyFilter('All', false);
   currentIdx = filteredEx.findIndex(e => !results[e._idx]);
