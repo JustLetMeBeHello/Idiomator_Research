@@ -1116,13 +1116,17 @@ async function loadLanguage(lang) {
     const resp = await fetch(`${API}/export/${encodeURIComponent(annotator)}`, { signal: AbortSignal.timeout(4000) });
     if (resp.ok) {
       const text = await resp.text();
-      const byMeaningId = {};
+      // Key by sentence, not meaning_id: IAA pools intentionally reuse a
+      // meaning_id across several sentences, so meaning_id maps one server
+      // record onto multiple test positions (inflated progress). sentence is
+      // unique per pool row.
+      const bySentence = {};
       text.trim().split('\n').filter(Boolean).forEach(l => {
         const rec = JSON.parse(l);
-        if (rec.language === lang) byMeaningId[rec.meaning_id] = rec;
+        if (rec.language === lang) bySentence[rec.sentence] = rec;
       });
       allExamples.forEach(e => {
-        const rec = byMeaningId[e.meaning_id];
+        const rec = bySentence[e.sentence];
         if (rec && !results[e._idx]) results[e._idx] = rec;
       });
     }

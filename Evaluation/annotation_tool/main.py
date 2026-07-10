@@ -217,18 +217,21 @@ def list_languages():
 
     db = SessionLocal()
     try:
+        # Count distinct sentences, not meaning_ids: meaning_id repeats across
+        # sentences in IAA pools, so counting it both under- and mis-reports
+        # progress. sentence is the unique per-item key.
         rows = db.query(
             AnnotationDB.language,
             AnnotationDB.annotator,
-            AnnotationDB.meaning_id,
+            AnnotationDB.sentence,
         ).all()
         by_lang: dict = defaultdict(lambda: defaultdict(set))
-        for lang, ann, mid in rows:
-            by_lang[lang][ann].add(mid)
+        for lang, ann, sent in rows:
+            by_lang[lang][ann].add(sent)
         for lang, ann_dict in by_lang.items():
             if lang in languages:
                 languages[lang]["annotators"] = {
-                    ann: len(mids) for ann, mids in ann_dict.items()
+                    ann: len(sents) for ann, sents in ann_dict.items()
                 }
     finally:
         db.close()
@@ -315,11 +318,14 @@ def save_annotation(annotation: Annotation):
     })
     db = SessionLocal()
     try:
+        # Key on sentence, not meaning_id: IAA pools reuse one meaning_id
+        # across several distinct sentences, so a meaning_id key would collapse
+        # them into one row (silent data loss). sentence is unique per pool row.
         existing = (
             db.query(AnnotationDB.annotation_id)
             .filter(
                 AnnotationDB.annotator == annotation.annotator,
-                AnnotationDB.meaning_id == annotation.meaning_id,
+                AnnotationDB.sentence == annotation.sentence,
                 AnnotationDB.language == annotation.language,
             )
             .first()
