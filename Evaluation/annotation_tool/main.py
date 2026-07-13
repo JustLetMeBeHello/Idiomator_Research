@@ -79,6 +79,8 @@ class AnnotationDB(Base):
     span_correction          = Column(String)
     sense_correct            = Column(String)   # "correct" | "wrong" | "uncertain" | null
     sense_notes              = Column(String)
+    syntax_correct           = Column(Boolean)
+    syntax_error_span        = Column(String)
     notes                    = Column(String)
     annotation_time_seconds  = Column(Float)
     validated_at             = Column(String)
@@ -89,7 +91,10 @@ Base.metadata.create_all(bind=engine)
 # Migrate older databases that lack the new columns
 def _migrate():
     with engine.connect() as conn:
-        for col, typedef in [("sense_correct", "TEXT"), ("sense_notes", "TEXT")]:
+        for col, typedef in [
+            ("sense_correct", "TEXT"), ("sense_notes", "TEXT"),
+            ("syntax_correct", "BOOLEAN"), ("syntax_error_span", "TEXT"),
+        ]:
             try:
                 conn.execute(text(f"ALTER TABLE annotations ADD COLUMN {col} {typedef}"))
                 conn.commit()
@@ -133,6 +138,8 @@ class Annotation(BaseModel):
     span_correction:         str | None = None
     sense_correct:           str | None = None   # "correct" | "wrong" | "uncertain"
     sense_notes:             str | None = None
+    syntax_correct:          bool | None = None
+    syntax_error_span:       str | None = None
     notes:                   str | None = None
     annotation_time_seconds: float
     validated_at:            str
@@ -179,6 +186,8 @@ def _row_to_dict(r: AnnotationDB) -> dict:
         "span_correction":        r.span_correction,
         "sense_correct":          r.sense_correct,
         "sense_notes":            r.sense_notes,
+        "syntax_correct":         r.syntax_correct,
+        "syntax_error_span":      r.syntax_error_span,
         "notes":                  r.notes,
         "annotation_time_seconds": r.annotation_time_seconds,
         "validated_at":           r.validated_at,

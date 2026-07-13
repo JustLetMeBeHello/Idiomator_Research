@@ -685,6 +685,17 @@
     <hr class="help-divider">
 
     <div class="help-section">
+      <h3><span class="num">④</span> Syntactic Accuracy</h3>
+      <p>Is the sentence <strong>grammatically well-formed</strong>? Mark <span class="tag-ok">Correct</span> if it reads naturally, <span class="tag-bad">Wrong</span> if some part is ungrammatical (e.g. wrong conjugation, wrong word order, wrong agreement).</p>
+      <div class="help-example">
+        <span class="tag-bad">✗ WRONG</span> — a word or phrase is inflected or ordered incorrectly.<br>
+        → Type the exact word or phrase that is syntactically wrong (copy it from the sentence).
+      </div>
+    </div>
+
+    <hr class="help-divider">
+
+    <div class="help-section">
       <h3>General tips</h3>
       <p>• <strong>Go with your first instinct</strong> — don't overthink. If you're uncertain after 30 seconds, mark it Uncertain and add a note.</p>
       <p>• <strong>You can go back</strong> — click <em>← Prev</em> to revisit and change any previous answer.</p>
@@ -819,6 +830,19 @@
         </div>
       </div>
 
+      <!-- Dimension 4: Syntactic accuracy -->
+      <div class="span-section">
+        <div class="section-label">④ Syntactic accuracy — is the sentence grammatically well-formed?</div>
+        <div class="three-btns">
+          <button class="choice-btn" id="syntaxCorrectBtn" onclick="selectSyntax(true)">✓ Correct</button>
+          <button class="choice-btn" id="syntaxWrongBtn"   onclick="selectSyntax(false)">✗ Wrong</button>
+        </div>
+        <div class="correction-area" id="syntaxErrorArea">
+          <label>Which part is syntactically wrong? (copy the exact text from the sentence above)</label>
+          <textarea id="syntaxErrorText" placeholder="e.g. the incorrectly inflected word or phrase"></textarea>
+        </div>
+      </div>
+
       <!-- Notes -->
       <div class="notes-area">
         <div class="section-label">Notes (optional)</div>
@@ -880,6 +904,7 @@ let filterLang    = 'All';
 let selIdio   = null;
 let selSpan   = null;
 let selSense  = null;
+let selSyntax = null;
 let exStartTime = null;
 
 const LANG_META = {
@@ -1237,7 +1262,7 @@ function switchFilter(lang) {
 
 function renderExample() {
   // Reset per-example state
-  selIdio = null; selSpan = null; selSense = null;
+  selIdio = null; selSpan = null; selSense = null; selSyntax = null;
 
   if (filteredEx.length === 0) { showDone(); return; }
 
@@ -1291,10 +1316,13 @@ function renderExample() {
   resetBtn('btnLiteral',   '📖 Literal');
   resetChoiceBtn('spanCorrectBtn', 'spanWrongBtn', null);
   resetSenseBtns(null);
+  resetChoiceBtn('syntaxCorrectBtn', 'syntaxWrongBtn', null);
   document.getElementById('correctionArea').classList.remove('visible');
   document.getElementById('correctionText').value   = '';
   document.getElementById('senseNotesArea').classList.remove('visible');
   document.getElementById('senseNotesText').value   = '';
+  document.getElementById('syntaxErrorArea').classList.remove('visible');
+  document.getElementById('syntaxErrorText').value  = '';
   document.getElementById('notesText').value         = '';
   document.getElementById('submitBtn').disabled      = true;
 
@@ -1308,6 +1336,11 @@ function renderExample() {
       selectSense(existing.sense_correct, false);
       if (existing.sense_notes)
         document.getElementById('senseNotesText').value = existing.sense_notes;
+    }
+    if (existing.syntax_correct !== null && existing.syntax_correct !== undefined) {
+      selectSyntax(existing.syntax_correct, false);
+      if (!existing.syntax_correct && existing.syntax_error_span)
+        document.getElementById('syntaxErrorText').value = existing.syntax_error_span;
     }
     document.getElementById('notesText').value = existing.notes || '';
   } else {
@@ -1390,10 +1423,23 @@ function selectSense(val, check = true) {
   if (check) checkCanSubmit();
 }
 
+function selectSyntax(correct, check = true) {
+  selSyntax = correct;
+  document.getElementById('syntaxCorrectBtn').className =
+    'choice-btn' + (correct === true  ? ' active-good' : '');
+  document.getElementById('syntaxWrongBtn').className =
+    'choice-btn' + (correct === false ? ' active-bad'  : '');
+  const ea = document.getElementById('syntaxErrorArea');
+  if (correct === false) ea.classList.add('visible');
+  else ea.classList.remove('visible');
+  if (check) checkCanSubmit();
+}
+
 function checkCanSubmit() {
   const hasDef = !document.getElementById('senseSection').classList.contains('hidden');
   // Sense is required only when definition is shown
-  const ready = selIdio !== null && selSpan !== null && (!hasDef || selSense !== null);
+  const ready = selIdio !== null && selSpan !== null && (!hasDef || selSense !== null)
+    && selSyntax !== null;
   document.getElementById('submitBtn').disabled = !ready;
 }
 
@@ -1404,9 +1450,10 @@ function checkCanSubmit() {
 
 async function submitExample() {
   const ex         = filteredEx[currentIdx];
-  const correction = document.getElementById('correctionText').value.trim();
-  const senseNotes = document.getElementById('senseNotesText').value.trim();
-  const notes      = document.getElementById('notesText').value.trim();
+  const correction  = document.getElementById('correctionText').value.trim();
+  const senseNotes  = document.getElementById('senseNotesText').value.trim();
+  const syntaxError = document.getElementById('syntaxErrorText').value.trim();
+  const notes       = document.getElementById('notesText').value.trim();
   const elapsed    = +((Date.now() - exStartTime) / 1000).toFixed(2);
 
   const record = {
@@ -1431,6 +1478,8 @@ async function submitExample() {
     span_correction:         selSpan ? null : (correction || null),
     sense_correct:           selSense || null,
     sense_notes:             (selSense === 'wrong' || selSense === 'uncertain') ? (senseNotes || null) : null,
+    syntax_correct:          selSyntax,
+    syntax_error_span:       selSyntax ? null : (syntaxError || null),
     notes:                   notes || null,
     annotation_time_seconds: elapsed,
     validated_at:            new Date().toISOString(),
@@ -1483,7 +1532,7 @@ function updateProgress() {
   document.getElementById('statCorrect').textContent = vals.filter(r => !r.label_changed).length;
   document.getElementById('statSpanOk').textContent  = vals.filter(r => r.span_correct).length;
   document.getElementById('statSenseOk').textContent = vals.filter(r => r.sense_correct === 'correct').length;
-  document.getElementById('statChanged').textContent = vals.filter(r => r.label_changed || !r.span_correct || r.sense_correct === 'wrong').length;
+  document.getElementById('statChanged').textContent = vals.filter(r => r.label_changed || !r.span_correct || r.sense_correct === 'wrong' || r.syntax_correct === false).length;
 
   renderFilterBar();
 }
@@ -1528,7 +1577,7 @@ function exportSummary() {
     if (r.sense_correct === 'correct')   b.sense_correct++;
     if (r.sense_correct === 'wrong')     b.sense_wrong++;
     if (r.sense_correct === 'uncertain') b.sense_uncertain++;
-    if (r.label_changed || !r.span_correct || r.sense_correct === 'wrong') b.corrections++;
+    if (r.label_changed || !r.span_correct || r.sense_correct === 'wrong' || r.syntax_correct === false) b.corrections++;
   });
   Object.values(byLang).forEach(b => {
     b.label_accuracy = b.total ? (b.label_correct / b.total * 100).toFixed(1) + '%' : '—';
