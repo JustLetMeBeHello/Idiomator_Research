@@ -49,6 +49,25 @@ Interpreting C for the paper
   and state that exact-match is unreliable at the measured IAA. (This is the
   council's salvage path.)
 
+What v2.1 adds (2026-07-13)
+----------------------------
+The same anchoring bias applies to idiomaticity and sense: the tool pre-fills
+the pipeline's own label/sense and asks the annotator to confirm or correct
+it (verification, not blind annotation), so when both annotators accept the
+pipeline's answer their "agreement" is inflated by construction, exactly like
+span. v2.1 extends the anchored/unanchored split to both dimensions:
+    idiomaticity: anchored  = BOTH annotators kept the original pipeline
+                              label (idiomaticity_verdict == original_idiomaticity)
+                  unanchored = at least one annotator overrode it
+    sense:        anchored  = BOTH annotators marked sense_correct == "correct"
+                  unanchored = at least one marked "wrong" or "uncertain"
+                  (only defined for items where a sense definition was shown)
+This does NOT recover a fully blind signal (an annotator who rubber-stamps a
+wrong pipeline answer without noticing still counts as "anchored agreement,
+correct" — no subset split can detect that). It only removes the specific
+inflation that comes from both annotators trivially confirming the same
+pre-filled value. A genuine blind spot-check is a separate, unimplemented fix.
+
 English caveat
 --------------
 Cohen's kappa requires TWO annotators. EN currently has one. Either recruit a
@@ -242,15 +261,28 @@ def build_items(ann_a, ann_b, sentences, language):
         else:
             iou = char_iou(sa, sb)
             exact = exact_boundary(sa, sb)
+
+        anchored_idio = (ra.get('idiomaticity_verdict') == ra.get('original_idiomaticity')) and \
+                        (rb.get('idiomaticity_verdict') == rb.get('original_idiomaticity'))
+
+        sense_a, sense_b = ra.get('sense_correct'), rb.get('sense_correct')
+        has_sense = sense_a is not None and sense_b is not None
+        anchored_sense = has_sense and sense_a == 'correct' and sense_b == 'correct'
+
         items.append({
             'meaning_id': mid,
             'idio_a': ra.get('idiomaticity_verdict'),
             'idio_b': rb.get('idiomaticity_verdict'),
+            'anchored_idio': anchored_idio,
             'accept_a': str(ra.get('span_correct')),
             'accept_b': str(rb.get('span_correct')),
             'iou': iou,
             'exact': exact,
             'anchored': anchored,
+            'sense_a': sense_a,
+            'sense_b': sense_b,
+            'has_sense': has_sense,
+            'anchored_sense': anchored_sense,
         })
     return items, n_boundary_undeterminable
 
@@ -262,17 +294,29 @@ def compute_language(items, n_boot, seed):
     boundary_items = [it for it in items if it['iou'] is not None]
     unanchored = [it for it in boundary_items if not it['anchored']]
 
+    idio_unanchored = [it for it in items if not it['anchored_idio']]
+
+    sense_items = [it for it in items if it['has_sense']]
+    sense_unanchored = [it for it in sense_items if not it['anchored_sense']]
+
     def ci(its, fn):
         return bootstrap_ci(its, fn, n_boot, random.Random(seed))
+
+    def pct(its, key_a, key_b):
+        return percent_agreement([i[key_a] for i in its], [i[key_b] for i in its])
 
     return {
         'n': len(items),
         'n_boundary': len(boundary_items),
         'n_unanchored': len(unanchored),
-        # A. idiomaticity label
+        'n_idio_unanchored': len(idio_unanchored),
+        'n_sense': len(sense_items),
+        'n_sense_unanchored': len(sense_unanchored),
+        # A. idiomaticity label — ALL (anchored upper bound) + UNANCHORED (real signal)
         'idiomaticity_kappa': ci(items, _kappa_metric('idio')),
-        'idiomaticity_pct': percent_agreement([i['idio_a'] for i in items],
-                                              [i['idio_b'] for i in items]),
+        'idiomaticity_pct': pct(items, 'idio_a', 'idio_b'),
+        'idiomaticity_kappa_unanchored': ci(idio_unanchored, _kappa_metric('idio')),
+        'idiomaticity_pct_unanchored': pct(idio_unanchored, 'idio_a', 'idio_b'),
         # B. span acceptance (old span_correct), honestly relabeled
         'acceptance_kappa': ci(items, _kappa_metric('accept')),
         # C-all: boundary agreement, anchored upper bound
@@ -281,6 +325,11 @@ def compute_language(items, n_boot, seed):
         # C-unanchored: boundary agreement, the real signal
         'iou_unanchored': ci(unanchored, _mean_iou),
         'exact_unanchored': ci(unanchored, _exact_rate),
+        # D. sense correctness — ALL (anchored upper bound) + UNANCHORED (real signal)
+        'sense_kappa': ci(sense_items, _kappa_metric('sense')),
+        'sense_pct': pct(sense_items, 'sense_a', 'sense_b'),
+        'sense_kappa_unanchored': ci(sense_unanchored, _kappa_metric('sense')),
+        'sense_pct_unanchored': pct(sense_unanchored, 'sense_a', 'sense_b'),
     }
 
 
@@ -307,9 +356,15 @@ def print_report(results, name_a, name_b):
             continue
         print(f"\n## {lang}   (n={r['n']}, boundary-determinable={r['n_boundary']}, "
               f"unanchored={r['n_unanchored']})")
-        print(f"  A  Idiomaticity kappa        : {_fmt(r['idiomaticity_kappa'])}")
-        print(f"     Idiomaticity % agreement  : "
+        print(f"  A  Idiomaticity — ALL (anchored upper bound):")
+        print(f"       kappa                   : {_fmt(r['idiomaticity_kappa'])}")
+        print(f"       % agreement             : "
               f"{r['idiomaticity_pct']*100:.1f}%" if r['idiomaticity_pct'] is not None else "—")
+        print(f"  A  Idiomaticity — UNANCHORED (>=1 overrode the pipeline label; "
+              f"n={r['n_idio_unanchored']}, the real signal):")
+        print(f"       kappa                   : {_fmt(r['idiomaticity_kappa_unanchored'])}")
+        print(f"       % agreement             : "
+              f"{r['idiomaticity_pct_unanchored']*100:.1f}%" if r['idiomaticity_pct_unanchored'] is not None else "—")
         print(f"  B  Span-acceptance kappa     : {_fmt(r['acceptance_kappa'])}  "
               f"(old span_correct; anchored, not a boundary metric)")
         print(f"  C  Boundary — ALL items (anchored upper bound):")
@@ -318,6 +373,15 @@ def print_report(results, name_a, name_b):
         print(f"  C  Boundary — UNANCHORED (>=1 correction; the real signal):")
         print(f"       mean char-IoU           : {_fmt(r['iou_unanchored'])}")
         print(f"       exact-boundary rate     : {_fmt(r['exact_unanchored'])}")
+        print(f"  D  Sense — ALL (anchored upper bound, n={r['n_sense']}):")
+        print(f"       kappa                   : {_fmt(r['sense_kappa'])}")
+        print(f"       % agreement             : "
+              f"{r['sense_pct']*100:.1f}%" if r['sense_pct'] is not None else "—")
+        print(f"  D  Sense — UNANCHORED (>=1 marked wrong/uncertain; "
+              f"n={r['n_sense_unanchored']}, the real signal):")
+        print(f"       kappa                   : {_fmt(r['sense_kappa_unanchored'])}")
+        print(f"       % agreement             : "
+              f"{r['sense_pct_unanchored']*100:.1f}%" if r['sense_pct_unanchored'] is not None else "—")
         # decision hint
         ex = r['exact_unanchored']
         if ex and ex[0] is not None:
@@ -330,22 +394,26 @@ def print_report(results, name_a, name_b):
 def print_latex(results):
     print("\n% ── LaTeX IAA table (MultiIdiom Sec 5.1 / IdiomBERT Sec 5) ──")
     print(r"\begin{table}[t]\centering\small")
-    print(r"\begin{tabular}{lrccc}")
+    print(r"\begin{tabular}{lrccccc}")
     print(r"\toprule")
-    print(r"\textbf{Lang} & \textbf{N} & \textbf{Idiom.\ $\kappa$} "
-          r"& \textbf{Bnd.\ IoU (unanch.)} & \textbf{Exact bnd.\ (unanch.)} \\")
+    print(r"\textbf{Lang} & \textbf{N} & \textbf{Idiom.\ $\kappa$ (unanch.)} "
+          r"& \textbf{Bnd.\ IoU (unanch.)} & \textbf{Exact bnd.\ (unanch.)} "
+          r"& \textbf{Sense $\kappa$ (unanch.)} & \textbf{Sense N} \\")
     print(r"\midrule")
     for lang, r in sorted(results.items()):
         if r is None:
             continue
-        print(f"{lang} & {r['n']} & {_fmt(r['idiomaticity_kappa'])} "
-              f"& {_fmt(r['iou_unanchored'])} & {_fmt(r['exact_unanchored'])} \\\\")
+        print(f"{lang} & {r['n']} & {_fmt(r['idiomaticity_kappa_unanchored'])} "
+              f"& {_fmt(r['iou_unanchored'])} & {_fmt(r['exact_unanchored'])} "
+              f"& {_fmt(r['sense_kappa_unanchored'])} & {r['n_sense_unanchored']} \\\\")
     print(r"\bottomrule\end{tabular}")
     print(r"\caption{Inter-annotator agreement on the doubly-annotated subset. "
-          r"Idiomaticity $\kappa$ (Cohen); boundary agreement reported on the "
-          r"\emph{unanchored} subset (at least one annotator rejected the "
-          r"pipeline span) to remove acceptance-anchoring bias. 95\% bootstrap "
-          r"CIs (10k resamples, seed 42).}")
+          r"All three dimensions (idiomaticity, span boundary, sense) are reported on the "
+          r"\emph{unanchored} subset only (at least one annotator rejected/overrode the "
+          r"pipeline's pre-filled answer) to remove acceptance-anchoring bias — the tool "
+          r"presents the pipeline's own label/span/sense for confirm-or-correct, so "
+          r"agreement on unchanged items is inflated by construction, not evidence of "
+          r"independent agreement. 95\% bootstrap CIs (10k resamples, seed 42).}")
     print(r"\label{tab:iaa}\end{table}")
 
 
