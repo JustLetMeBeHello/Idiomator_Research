@@ -90,16 +90,15 @@ Base.metadata.create_all(bind=engine)
 
 # Migrate older databases that lack the new columns
 def _migrate():
-    with engine.connect() as conn:
-        for col, typedef in [
-            ("sense_correct", "TEXT"), ("sense_notes", "TEXT"),
-            ("syntax_correct", "BOOLEAN"), ("syntax_error_span", "TEXT"),
-        ]:
-            try:
+    for col, typedef in [
+        ("sense_correct", "TEXT"), ("sense_notes", "TEXT"),
+        ("syntax_correct", "BOOLEAN"), ("syntax_error_span", "TEXT"),
+    ]:
+        try:
+            with engine.begin() as conn:
                 conn.execute(text(f"ALTER TABLE annotations ADD COLUMN {col} {typedef}"))
-                conn.commit()
-            except Exception:
-                pass  # column already exists
+        except Exception:
+            pass  # column already exists
 
 _migrate()
 
