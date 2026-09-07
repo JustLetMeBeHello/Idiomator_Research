@@ -36,3 +36,7 @@ CLAUDE.md
 *.db
 *.db.bak*
 annotations.db*
+# Scratch curriculum: derived subset (regenerable, seed=42) + downloaded weights
+scratch/subset/
+scratch/vocab/
+scratch/.venv/
