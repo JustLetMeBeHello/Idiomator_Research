@@ -449,8 +449,8 @@ def evaluate(model, loader, tokenizer, examples, device, split_name, max_len):
     # Classification metrics
     macro_f1    = f1_score(all_cls_labels, all_cls_preds, average='macro')
     report      = classification_report(
-        all_cls_labels, all_cls_preds,
-        target_names=['literal', 'idiomatic'], digits=4
+        all_cls_labels, all_cls_preds, labels=[0, 1],
+        target_names=['literal', 'idiomatic'], digits=4, zero_division=0
     )
 
     # Span metrics
