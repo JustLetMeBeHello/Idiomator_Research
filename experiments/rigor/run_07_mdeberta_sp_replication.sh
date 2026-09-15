@@ -72,8 +72,12 @@ BATCH="${BATCH:-16}"      # rembert ~576M params; 16 fits T4. (XLM-R matrix used
 GRAD_ACCUM="${GRAD_ACCUM:-1}"  # gradient accumulation steps; effective batch = BATCH × GRAD_ACCUM
 JOINT="training/Train_Join.py"
 BIO="experiments/ablations/BiO_Task_mBERT_train.py"
-LANGS="English Spanish Hindi Telugu"
-TEST_LANGS="English Spanish Hindi Telugu Indonesian"
+LANGS="${LANGS:-English Spanish Hindi Telugu}"
+TEST_LANGS="${TEST_LANGS:-English Spanish Hindi Telugu Indonesian}"
+# NER replication (C1 beyond idioms): DATA_DIR=data/ner_wikiann_en/Splits LANGS=English TEST_LANGS=English OUT_SUB=flip
+DATA_DIR="${DATA_DIR:-data/idioms_structured/Splits}"
+OUT_SUB="${OUT_SUB:-$ENC_SHORT}"   # run_08 SOURCES expects xlmr/mbert/muril under flip/
+SEEDS="${SEEDS:-42 123 7}"
 
 DRY_RUN=0
 [[ "${1:-}" == "--dry-run" ]] && DRY_RUN=1
@@ -84,7 +88,7 @@ DRY_RUN=0
 # HARD-FAIL before training if the link is not actually Drive-backed/writable.
 # Output dirs are created per run below; here we just gate the base path.
 if [[ -n "${DRIVE_OUT:-}" ]]; then
-    OUT_BASE="$DRIVE_OUT/$ENC_SHORT"
+    OUT_BASE="$DRIVE_OUT/$OUT_SUB"
     mkdir -p "$OUT_BASE"
     python - "$DRIVE_OUT" <<'PY'
 import os, sys
@@ -97,14 +101,14 @@ os.remove(probe)
 print(f"✓ persistence gate passed — outputs are Drive-backed and writable under {drive}")
 PY
 else
-    OUT_BASE="models/$ENC_SHORT"
+    OUT_BASE="models/$OUT_SUB"
     mkdir -p "$OUT_BASE"
     echo "⚠ DRIVE_OUT unset — outputs go to local $OUT_BASE (OK locally; EPHEMERAL on Colab)"
 fi
 
 run_joint () {  # $1=outdir  $2=epochs  $3=seed
     python -u "$JOINT" \
-        --model_name "$MODEL" --output_dir "$1" \
+        --model_name "$MODEL" --data_dir "$DATA_DIR" --output_dir "$1" \
         --langs $LANGS --test_langs $TEST_LANGS \
         --epochs "$2" --batch_size "$BATCH" --grad_accum_steps "$GRAD_ACCUM" --lr "${LR_JOINT:-3e-6}" \
         --cls_loss_weight 0.3 --span_loss_weight 1.9 --seed "$3" \
@@ -112,7 +116,7 @@ run_joint () {  # $1=outdir  $2=epochs  $3=seed
 }
 run_bio () {    # $1=outdir  $2=epochs  $3=seed
     python -u "$BIO" \
-        --model_name "$MODEL" --output_dir "$1" \
+        --model_name "$MODEL" --data_dir "$DATA_DIR" --output_dir "$1" \
         --langs $LANGS --test_langs $TEST_LANGS \
         --epochs "$2" --batch_size "$BATCH" --lr "${LR_BIO:-2e-6}" --o_weight 0.104 --seed "$3" \
         2>&1 | tee -a "$1/console.log"
@@ -134,14 +138,14 @@ if [[ "$DRY_RUN" == "1" ]]; then
     DJ="$OUT_BASE/_dryrun_joint"; DB="$OUT_BASE/_dryrun_bio"
     mkdir -p "$DJ" "$DB"
     echo; echo "── dry A) Joint (QA) ──"
-    python -u "$JOINT" --model_name "$MODEL" --output_dir "$DJ" \
+    python -u "$JOINT" --model_name "$MODEL" --data_dir "$DATA_DIR" --output_dir "$DJ" \
         --langs English --test_langs English \
         --epochs 1 --batch_size 8 --lr "${LR_JOINT:-3e-6}" \
         --cls_loss_weight 0.3 --span_loss_weight 1.9 --seed 42 \
         2>&1 | tee -a "$DJ/console.log"
     assert_outputs "$DJ" "dry-joint"
     echo; echo "── dry B) BIO ──"
-    python -u "$BIO" --model_name "$MODEL" --output_dir "$DB" \
+    python -u "$BIO" --model_name "$MODEL" --data_dir "$DATA_DIR" --output_dir "$DB" \
         --langs English --test_langs English \
         --epochs 1 --batch_size 8 --lr "${LR_BIO:-2e-6}" --o_weight 0.104 --seed 42 \
         2>&1 | tee -a "$DB/console.log"
@@ -154,7 +158,7 @@ if [[ "$DRY_RUN" == "1" ]]; then
 fi
 
 echo "═══ FULL MATRIX — $ENC_SHORT ($MODEL) QA vs BIO × seeds {42,123,7} ═══"
-for SEED in 42 123 7; do
+for SEED in $SEEDS; do
     JD="$OUT_BASE/${ENC_SHORT}_joint_s${SEED}"
     BD="$OUT_BASE/${ENC_SHORT}_bio_s${SEED}"
     mkdir -p "$JD" "$BD"
