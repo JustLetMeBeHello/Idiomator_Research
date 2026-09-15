@@ -164,8 +164,9 @@ def compute_cls_loss_weights(train_examples, device):
         class_weighted[cls] += cell_weights[(ex['language'], cls)]
         class_counts[cls]   += 1
 
-    literal_w   = class_weighted['literal']   / class_counts['literal']
-    idiomatic_w = class_weighted['idiomatic'] / class_counts['idiomatic']
+    # A class absent from training (e.g. single-class NER replication data) gets weight 1.0
+    literal_w   = class_weighted['literal']   / class_counts['literal']   if class_counts['literal']   else 1.0
+    idiomatic_w = class_weighted['idiomatic'] / class_counts['idiomatic'] if class_counts['idiomatic'] else 1.0
 
     min_w       = min(literal_w, idiomatic_w)
     literal_w  /= min_w
