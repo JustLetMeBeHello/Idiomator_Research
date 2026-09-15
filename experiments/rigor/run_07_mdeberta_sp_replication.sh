@@ -118,7 +118,7 @@ run_bio () {    # $1=outdir  $2=epochs  $3=seed
     python -u "$BIO" \
         --model_name "$MODEL" --data_dir "$DATA_DIR" --output_dir "$1" \
         --langs $LANGS --test_langs $TEST_LANGS \
-        --epochs "$2" --batch_size "$BATCH" --lr "${LR_BIO:-2e-6}" --o_weight 0.104 --seed "$3" \
+        --epochs "$2" --batch_size "$BATCH" --lr "${LR_BIO:-2e-6}" --o_weight "${O_WEIGHT:-0.104}" --seed "$3" \
         2>&1 | tee -a "$1/console.log"
 }
 
@@ -147,7 +147,7 @@ if [[ "$DRY_RUN" == "1" ]]; then
     echo; echo "── dry B) BIO ──"
     python -u "$BIO" --model_name "$MODEL" --data_dir "$DATA_DIR" --output_dir "$DB" \
         --langs English --test_langs English \
-        --epochs 1 --batch_size 8 --lr "${LR_BIO:-2e-6}" --o_weight 0.104 --seed 42 \
+        --epochs 1 --batch_size 8 --lr "${LR_BIO:-2e-6}" --o_weight "${O_WEIGHT:-0.104}" --seed 42 \
         2>&1 | tee -a "$DB/console.log"
     assert_outputs "$DB" "dry-bio"
     echo
