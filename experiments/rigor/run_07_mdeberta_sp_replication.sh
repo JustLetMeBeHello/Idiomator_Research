@@ -87,8 +87,18 @@ DRY_RUN=0
 # DRIVE_OUT at a mounted-Drive dir to force outputs through to Drive, then
 # HARD-FAIL before training if the link is not actually Drive-backed/writable.
 # Output dirs are created per run below; here we just gate the base path.
+# WORK_LOCAL=1 trains into ephemeral /content and copies only the small artifacts
+# (test_predictions.jsonl, metrics.json, console.log) to Drive after each run —
+# checkpoints are 1-2.3 GB each and blew the Drive quota mid-matrix.
+PERSIST_BASE=""
 if [[ -n "${DRIVE_OUT:-}" ]]; then
-    OUT_BASE="$DRIVE_OUT/$OUT_SUB"
+    PERSIST_BASE="$DRIVE_OUT/$OUT_SUB"
+    mkdir -p "$PERSIST_BASE"
+    if [[ "${WORK_LOCAL:-0}" == "1" ]]; then
+        OUT_BASE="${WORK_BASE:-/content/ner_work}/$OUT_SUB"
+    else
+        OUT_BASE="$PERSIST_BASE"
+    fi
     mkdir -p "$OUT_BASE"
     python - "$DRIVE_OUT" <<'PY'
 import os, sys
@@ -120,6 +130,16 @@ run_bio () {    # $1=outdir  $2=epochs  $3=seed
         --langs $LANGS --test_langs $TEST_LANGS \
         --epochs "$2" --batch_size "$BATCH" --lr "${LR_BIO:-2e-6}" --o_weight "${O_WEIGHT:-0.104}" --seed "$3" \
         2>&1 | tee -a "$1/console.log"
+}
+
+persist () {  # $1=outdir — copy the small artifacts to Drive when training locally
+    [[ -z "$PERSIST_BASE" || "$OUT_BASE" == "$PERSIST_BASE" ]] && return 0
+    local dest="$PERSIST_BASE/$(basename "$1")"
+    mkdir -p "$dest"
+    for f in test_predictions.jsonl metrics.json console.log; do
+        [[ -f "$1/$f" ]] && cp "$1/$f" "$dest/$f"
+    done
+    echo "  ✓ persisted $(basename "$1") → $dest"
 }
 
 assert_outputs () {  # $1=outdir  $2=label — fail fast if the run produced nothing usable
@@ -164,22 +184,24 @@ for SEED in $SEEDS; do
     mkdir -p "$JD" "$BD"
 
     echo; echo "── Joint (QA)  seed $SEED ──────────────────────────────────────"
-    if [[ -s "$JD/metrics.json" && "${FORCE:-0}" != "1" ]]; then
+    if [[ -s "${PERSIST_BASE:-$OUT_BASE}/$(basename "$JD")/metrics.json" && "${FORCE:-0}" != "1" ]]; then
         echo "skip (metrics.json exists; set FORCE=1 to overwrite)"
     else
         rm -rf "$JD/best_model"          # stale weights from a prior partial run
         run_joint "$JD" 7 "$SEED"
         assert_outputs "$JD" "joint s$SEED"
+        persist "$JD"
         rm -rf "$JD/best_model"          # checkpoint-deletion policy + Drive quota
     fi
 
     echo; echo "── BIO  seed $SEED ─────────────────────────────────────────────"
-    if [[ -s "$BD/metrics.json" && "${FORCE:-0}" != "1" ]]; then
+    if [[ -s "${PERSIST_BASE:-$OUT_BASE}/$(basename "$BD")/metrics.json" && "${FORCE:-0}" != "1" ]]; then
         echo "skip (metrics.json exists; set FORCE=1 to overwrite)"
     else
         rm -rf "$BD/best_model"
         run_bio "$BD" 6 "$SEED"
         assert_outputs "$BD" "bio s$SEED"
+        persist "$BD"
         rm -rf "$BD/best_model"
     fi
 done
