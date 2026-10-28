@@ -1131,6 +1131,13 @@ async function loadLanguage(lang) {
   allExamples = examples;
   allExamples.forEach((e, i) => { e._idx = i; });
 
+  // Re-key device-saved results by sentence: _idx is a pool position, so a
+  // reordered pool would otherwise attach saved answers to the wrong items.
+  const savedBySentence = {};
+  Object.values(results).forEach(r => { if (r && r.sentence) savedBySentence[r.sentence] = r; });
+  results = {};
+  allExamples.forEach(e => { if (savedBySentence[e.sentence]) results[e._idx] = savedBySentence[e.sentence]; });
+
   // Restore this annotator's already-submitted items from the server, keyed by
   // meaning_id — localStorage alone only covers this browser/device, so a
   // second device (or a cleared cache) would otherwise re-show already-done
