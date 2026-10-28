@@ -96,6 +96,11 @@ SOURCES = {
     "mbert":   ("flip",    "mbert_{system}_s{seed}",   "WordPiece"),
     "muril":   ("flip",    "muril_{system}_s{seed}",   "WordPiece"),
 }
+# Paper B byte-level BPE prediction test (RoBERTa). Opt-in so run_13, which only
+# knows SentencePiece/WordPiece families, is unaffected:
+#   BBPE=1 python experiments/rigor/run_08_extended_gold.py ...
+if _os.environ.get("BBPE") == "1":
+    SOURCES["roberta"] = ("bbpe", "roberta_{system}_s{seed}", "ByteBPE")
 LANGS_ORDER = ["English", "Spanish", "Hindi", "Telugu", "Indonesian"]
 GOLD_MODES  = ["original", "extend", "strip"]
 

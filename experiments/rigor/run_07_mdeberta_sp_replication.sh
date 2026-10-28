@@ -136,7 +136,7 @@ persist () {  # $1=outdir — copy the small artifacts to Drive when training lo
     [[ -z "$PERSIST_BASE" || "$OUT_BASE" == "$PERSIST_BASE" ]] && return 0
     local dest="$PERSIST_BASE/$(basename "$1")"
     mkdir -p "$dest"
-    for f in test_predictions.jsonl metrics.json console.log; do
+    for f in test_predictions.jsonl metrics.json console.log config.json; do
         [[ -f "$1/$f" ]] && cp "$1/$f" "$dest/$f"
     done
     echo "  ✓ persisted $(basename "$1") → $dest"

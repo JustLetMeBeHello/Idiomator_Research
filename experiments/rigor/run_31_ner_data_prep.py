@@ -37,6 +37,7 @@ from datasets import load_dataset
 
 CLOSERS = set(",.;:!?'\"’”)]}…।॥")  # danda/double danda: Hindi sentence enders
 OPENERS = set("([{‘“")
+SPACE_JOIN = False  # --space-join: Paper B causal control, same examples with punctuation detached
 
 
 def reconstruct(tokens):
@@ -49,7 +50,7 @@ def reconstruct(tokens):
     sentence = ""
     spans = []
     for i, tok in enumerate(tokens):
-        if i > 0 and not set(tok) <= CLOSERS and tokens[i - 1] not in OPENERS:
+        if i > 0 and (SPACE_JOIN or (not set(tok) <= CLOSERS and tokens[i - 1] not in OPENERS)):
             sentence += " "
         start = len(sentence)
         sentence += tok
@@ -125,7 +126,12 @@ def main():
     ap.add_argument("--max-dev", type=int, default=500)
     ap.add_argument("--max-test", type=int, default=500)
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--space-join", action="store_true",
+                     help="Join all tokens with spaces (old behaviour). Selects the same "
+                          "examples; only removes attached punctuation. Causal control.")
     args = ap.parse_args()
+    global SPACE_JOIN
+    SPACE_JOIN = args.space_join
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
