@@ -36,6 +36,8 @@ import numpy as np
 from pathlib import Path
 from collections import defaultdict, Counter
 
+import inspect
+import os
 import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import (
@@ -59,6 +61,8 @@ try:
     TORCHCRF = True
 except ImportError:
     TORCHCRF = False
+
+TRC = os.environ.get('TRUST_REMOTE_CODE') == '1'  # EuroBERT etc. ship custom modeling code
 
 
 
@@ -300,7 +304,8 @@ class BIOTagger(torch.nn.Module):
 
     def __init__(self, model_name, num_labels=NUM_LABELS, dropout=0.1):
         super().__init__()
-        self.bert    = AutoModel.from_pretrained(model_name)
+        self.bert    = AutoModel.from_pretrained(model_name, trust_remote_code=TRC)
+        self.use_tt = 'token_type_ids' in inspect.signature(self.bert.forward).parameters  # EuroBERT/ModernBERT reject it
         hidden_size  = self.bert.config.hidden_size
         self.dropout = torch.nn.Dropout(dropout)
         self.head    = torch.nn.Linear(hidden_size, num_labels)
@@ -309,7 +314,7 @@ class BIOTagger(torch.nn.Module):
         outputs  = self.bert(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
+            **({'token_type_ids': token_type_ids} if self.use_tt else {}),
         )
         seq_out  = self.dropout(outputs.last_hidden_state.float())  # cast: mDeBERTa-v3 can emit fp16 on GPU
         logits   = self.head(seq_out)                        # [B, T, 3]
@@ -325,7 +330,7 @@ class BIOTaggerCRF(torch.nn.Module):
         super().__init__()
         if not TORCHCRF:
             raise ImportError("pytorch-crf not installed. Run: pip install pytorch-crf")
-        self.bert     = AutoModel.from_pretrained(model_name)
+        self.bert     = AutoModel.from_pretrained(model_name, trust_remote_code=TRC)
         hidden_size   = self.bert.config.hidden_size
         self.dropout  = torch.nn.Dropout(dropout)
         self.head     = torch.nn.Linear(hidden_size, num_labels)
@@ -601,7 +606,7 @@ def train(args):
     test_langs = args.test_langs or args.langs
     test_examples  = load_split(args.data_dir, 'test',  test_langs)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name, trust_remote_code=TRC)
 
     print("\nTokenizing + aligning BIO labels...")
     cell_weights = compute_lang_loss_weights(train_examples)

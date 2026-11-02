@@ -101,6 +101,8 @@ SOURCES = {
 #   BBPE=1 python experiments/rigor/run_08_extended_gold.py ...
 if _os.environ.get("BBPE") == "1":
     SOURCES["roberta"] = ("bbpe", "roberta_{system}_s{seed}", "ByteBPE")
+    SOURCES["eurobert"] = ("bbpe", "eurobert_{system}_s{seed}", "ByteBPE")   # Block E (Llama-3 tokenizer)
+    SOURCES["modernbert"] = ("bbpe", "modernbert_{system}_s{seed}", "ByteBPE")
 LANGS_ORDER = ["English", "Spanish", "Hindi", "Telugu", "Indonesian"]
 GOLD_MODES  = ["original", "extend", "strip"]
 

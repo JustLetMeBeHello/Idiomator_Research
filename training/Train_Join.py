@@ -41,6 +41,8 @@ import numpy as np
 from pathlib import Path
 from collections import defaultdict, Counter
 
+import inspect
+import os
 import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import (
@@ -58,6 +60,8 @@ try:
 except ImportError:
     WANDB = False
     print("wandb not installed — skipping. pip install wandb to enable.")
+
+TRC = os.environ.get('TRUST_REMOTE_CODE') == '1'  # EuroBERT etc. ship custom modeling code
 
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -330,7 +334,8 @@ class JointIdiomModel(torch.nn.Module):
 
     def __init__(self, model_name):
         super().__init__()
-        self.bert        = AutoModel.from_pretrained(model_name)
+        self.bert        = AutoModel.from_pretrained(model_name, trust_remote_code=TRC)
+        self.use_tt = 'token_type_ids' in inspect.signature(self.bert.forward).parameters  # EuroBERT/ModernBERT reject it
         hidden_size      = self.bert.config.hidden_size
 
         self.cls_head    = torch.nn.Linear(hidden_size, 2)   # literal / idiomatic
@@ -341,7 +346,7 @@ class JointIdiomModel(torch.nn.Module):
         outputs    = self.bert(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
+            **({'token_type_ids': token_type_ids} if self.use_tt else {}),
         )
         seq_output = outputs.last_hidden_state.float()  # cast: mDeBERTa-v3 can emit fp16 on GPU
         cls_output = seq_output[:, 0, :]            # [batch, hidden]  ([CLS] token)
@@ -372,7 +377,7 @@ def save_model(model, tokenizer, output_dir):
 
 def load_best_model(model_name, output_dir, device):
     model      = JointIdiomModel(model_name)
-    model.bert = AutoModel.from_pretrained(output_dir / 'best_model')
+    model.bert = AutoModel.from_pretrained(output_dir / 'best_model', trust_remote_code=TRC)
     heads      = torch.load(
         output_dir / 'best_model' / 'task_heads.pt', map_location='cpu', weights_only=True
     )
@@ -497,7 +502,7 @@ def train(args):
     test_langs = args.test_langs or args.langs
     test_examples  = build_dataset_for_split('test',  args.data_dir, test_langs, args.seed)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name, trust_remote_code=TRC)
 
     print("Tokenizing train...")
     train_ds = JointDataset(train_examples, tokenizer, args.max_len)
