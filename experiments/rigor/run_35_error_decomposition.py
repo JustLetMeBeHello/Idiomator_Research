@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import run_08_extended_gold as r  # noqa: E402
 
 ROOTS = ["NER_multi", "NER_lr3e5", "NER_absa_restaurants", "NER_absa_laptops",
-         "NER_absa_restaurants_ow1", "NER_absa_laptops_ow1", "NER_en_bbpe", "NER_en_sj"]
+         "NER_absa_restaurants_ow1", "NER_absa_laptops_ow1", "NER_en_bbpe", "NER_en_sj", "NER_squad", "NER_squad_ow1"]
 CATS = ["exact", "punct_only", "lead_punct", "too_short", "too_long", "shifted", "disjoint", "none"]
 LEAD_PUNCT = set("\"'([{“‘«¿¡")
 
