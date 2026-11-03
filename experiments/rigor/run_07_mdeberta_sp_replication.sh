@@ -45,6 +45,7 @@
 #   bs note: QA−BIO gap is measured WITHIN an encoder (both at the same bs), and
 #            the cross-encoder comparison is of gaps, so bs 16 vs 32 is not a
 #            confound for the claim.
+#   Override epochs with EPOCHS_JOINT / EPOCHS_BIO (6.15 epoch-matched control).
 #   Seeds: 42 123 7   Langs: EN ES HI TE (train+test)  +ID test-only
 #
 # METRIC INTEGRITY. These are FRESH runs — NOT canonical, NOT in
@@ -188,7 +189,7 @@ for SEED in $SEEDS; do
         echo "skip (metrics.json exists; set FORCE=1 to overwrite)"
     else
         rm -rf "$JD/best_model"          # stale weights from a prior partial run
-        run_joint "$JD" 7 "$SEED"
+        run_joint "$JD" "${EPOCHS_JOINT:-7}" "$SEED"
         assert_outputs "$JD" "joint s$SEED"
         persist "$JD"
         rm -rf "$JD/best_model"          # checkpoint-deletion policy + Drive quota
@@ -199,7 +200,7 @@ for SEED in $SEEDS; do
         echo "skip (metrics.json exists; set FORCE=1 to overwrite)"
     else
         rm -rf "$BD/best_model"
-        run_bio "$BD" 6 "$SEED"
+        run_bio "$BD" "${EPOCHS_BIO:-6}" "$SEED"
         assert_outputs "$BD" "bio s$SEED"
         persist "$BD"
         rm -rf "$BD/best_model"
