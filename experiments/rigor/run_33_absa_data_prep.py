@@ -48,9 +48,9 @@ def get(url, tries=8):
             with urllib.request.urlopen(url, timeout=60) as r:
                 return r.read().decode()
         except urllib.error.HTTPError as e:
-            if e.code != 429 or i == tries - 1:
+            if (e.code != 429 and e.code < 500) or i == tries - 1:
                 raise
-            time.sleep(2 ** i)  # run_32 hit 429s on this endpoint
+            time.sleep(2 ** i)  # run_32 hit 429s on this endpoint; the server also returns transient 500s
 
 
 def fetch_rows(config, split):

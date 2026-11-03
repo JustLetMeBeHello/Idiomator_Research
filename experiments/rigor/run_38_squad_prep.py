@@ -27,28 +27,14 @@ import json
 import random
 import re
 import sys
-import time
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from run_33_absa_data_prep import TARGET_RATIO, stats  # noqa: E402
+from run_33_absa_data_prep import TARGET_RATIO, get, stats  # noqa: E402
 
 ROWS = "https://datasets-server.huggingface.co/rows?dataset=rajpurkar/squad&config=plain_text&split={}&offset={}&length=100"
 TOTAL = {"train": 87599, "validation": 10570}
 SENT_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'(\[])")
-
-
-def get(url, tries=8):
-    for i in range(tries):
-        try:
-            with urllib.request.urlopen(url, timeout=60) as r:
-                return r.read().decode()
-        except urllib.error.HTTPError as e:
-            if e.code != 429 or i == tries - 1:
-                raise
-            time.sleep(2 ** i)
 
 
 def fetch_pages(split, n_pages, rng):

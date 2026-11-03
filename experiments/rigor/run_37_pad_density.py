@@ -95,7 +95,7 @@ def main():
     for name in ("train", "dev", "test"):
         if (out / f"{name}.jsonl").exists() and not a.force:
             raise SystemExit(f"{out / (name + '.jsonl')} exists — pass --force to overwrite (idempotency rule).")
-    pool = clean_pool(json.loads(l)["sentence"] for p in a.pool for l in open(p, encoding="utf-8"))
+    pool = clean_pool(json.loads(l)["sentence"] for p in a.pool if Path(p).exists() for l in open(p, encoding="utf-8"))
     assert len(pool) >= 200, f"distractor pool too small ({len(pool)}): build the ABSA splits with run_33 first"
 
     meta = {"target_density": a.density, "seed": a.seed, "pool_size": len(pool), "splits": {}}
